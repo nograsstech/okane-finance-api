@@ -1,0 +1,13 @@
+pymongo
+asyncio
+datetime
+loguru
+aiohttp
+pandas
+python-dotenv
+fastapi
+requests
+pydantic
+uvicorn
+yfinance
+backtesting
