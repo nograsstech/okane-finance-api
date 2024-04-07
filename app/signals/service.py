@@ -1,4 +1,5 @@
 import yfinance as yf
+from fastapi import FastAPI, HTTPException
 from app.base.utils.mongodb import connect_mongodb, COLLECTIONS
 from starlette.status import HTTP_200_OK
 from app.signals.utils.yfinance import getYFinanceData
@@ -34,19 +35,13 @@ async def get_signals(
     try:
         df = getYFinanceData(ticker, interval, period, start, end);
     except Exception as e:
-        return {
-            "status": 400,
-            "message": f"Failed to fetch data from Yahoo Finance. Error: {e}",
-        }
+        raise HTTPException(status_code=400, detail=f"Failed to fetch data from Yahoo Finance. Error: {e}")
         
     signals_df = None
     try:
         signals_df = await calculate_signals(df, strategy, parameters)
     except Exception as e:
-        return {
-            "status": 400,
-            "message": f"Failed to calculate signals. Error: {e}",
-        }
+        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         
     current_signal = signals_df.iloc[-1]
     current_signal = json.loads(current_signal.to_json())
@@ -97,19 +92,13 @@ async def get_backtest_result(
     try:
         df = getYFinanceData(ticker, interval, period, start, end);
     except Exception as e:
-        return {
-            "status": 400,
-            "message": f"Failed to fetch data from Yahoo Finance. Error: {e}",
-        }
+        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         
     signals_df = None
     try:
         signals_df = await calculate_signals(df, strategy, parameters)
     except Exception as e:
-        return {
-            "status": 400,
-            "message": f"Failed to calculate signals. Error: {e}",
-        }
+        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
     
     bt, stats, heatmap = backtest(signals_df, {
         "size": 0.03,
