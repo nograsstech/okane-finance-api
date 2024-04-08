@@ -16,33 +16,33 @@ class SignalResponseDTO(BaseModel):
     message: str = Field(...)
     
 class BacktestStats(BaseModel):
-    ticker: Optional[Any]
-    max_drawdown_percentage: Optional[float]
-    start: Optional[Any]
-    end: Optional[Any]
-    duration: Optional[Any]
-    exposure_time_percentage: Optional[float]
-    final_equity: Optional[float]
-    peak_equity: Optional[float]
-    return_percentage: Optional[float] 
-    buy_and_hold_return: Optional[float]
-    return_annualized: Optional[float]
-    volatility_annualized: Optional[float]
-    sharpe_ratio: Optional[float]
-    sortino_ratio: Optional[float]
-    calmar_ratio: Optional[float]
-    average_drawdown_percentage: Optional[float]
-    max_drawdown_duration: Optional[Any]
-    average_drawdown_duration: Optional[Any]
-    trade_count: Optional[int]
-    win_rate: Optional[float]
-    best_trade: Optional[float]
-    worst_trade: Optional[float]
-    avg_trade: Optional[float]
-    max_trade_duration: Optional[Any]
-    average_trade_duration: Optional[Any]
-    profit_factor: Optional[float]
-    html: Optional[Any]
+    ticker: Any
+    max_drawdown_percentage: float
+    start_time: Any
+    end_time: Any
+    duration: Any
+    exposure_time_percentage: float
+    final_equity: float
+    peak_equity: float
+    return_percentage: float
+    buy_and_hold_return: float
+    return_annualized: float
+    volatility_annualized: float
+    sharpe_ratio: float
+    sortino_ratio: float
+    calmar_ratio: float
+    average_drawdown_percentage: float
+    max_drawdown_duration: Any
+    average_drawdown_duration: Any
+    trade_count: int
+    win_rate: float
+    best_trade: float
+    worst_trade: float
+    avg_trade: float
+    max_trade_duration: Any
+    average_trade_duration: Any
+    profit_factor: float
+    html: Any
     
 class BacktestResponseDTO(BaseModel):
     status: int = Field(...)
