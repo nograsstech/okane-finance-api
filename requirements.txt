@@ -11,3 +11,6 @@ pydantic
 uvicorn
 yfinance
 backtesting
+typing
+pandas_ta
+numpy

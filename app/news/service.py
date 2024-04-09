@@ -42,7 +42,7 @@ async def fetch_alpha_vantage_news(_params: AlphaVantageNewsQueryDTO):
 
     # Remove keys with None values
     params = {k: v for k, v in params.items() if (
-        v is not None or v is not "")}
+        v != None or v != "")}
 
     # fetch news and sentiment data
     r = requests.get(base_url, params=params)
