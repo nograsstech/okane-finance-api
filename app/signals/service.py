@@ -7,7 +7,8 @@ from app.signals.strategies.calculate import calculate_signals
 from app.signals.strategies.ema_bollinger_backtest import backtest
 import json
 import os
-
+import logging
+logging.basicConfig(level=logging.INFO)
 
 async def get_signals(
     ticker, interval, period, strategy, parameters, start=None, end=None
@@ -30,7 +31,6 @@ async def get_signals(
     Raises:
         Exception: If there is an error fetching data from Yahoo Finance or calculating signals.
     """
-    
     df = None
     try:
         df = getYFinanceData(ticker, interval, period, start, end);
@@ -88,6 +88,8 @@ async def get_backtest_result(
         Exception: If there is an error fetching data from Yahoo Finance or calculating signals.
 
     """
+    print("I am running the backtest")
+    logging.info("get_backtest_result started")
     df = None
     try:
         df = getYFinanceData(ticker, interval, period, start, end);
@@ -114,7 +116,11 @@ async def get_backtest_result(
         # delete the html file
         file.close()
         os.remove("backtest.html")
-
+    logging.info("get_backtest_result finished")
+    # write to a text file
+    with open("backtest.txt", "w") as file:
+        file.write(str(stats))
+        file.close()
     return {
         "status": HTTP_200_OK,
         "message": "Backtest results",
