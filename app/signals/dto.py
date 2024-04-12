@@ -1,14 +1,14 @@
 from pydantic import BaseModel, Field
-from typing import Any
+from typing import Any, Optional
 
 class SignalRequestDTO(BaseModel):
     ticker: str = Field(...)
-    period: str = Field(None)
+    period: Optional[str] = Field(None)
     interval: str = Field(...)
-    strategy: str = Field(None)
-    parameters: str = Field(None)
-    start: str = Field(None)
-    end: str = Field(None)
+    strategy: Optional[str] = Field(None)
+    parameters: Optional[str] = Field(None)
+    start: Optional[str] = Field(None)
+    end: Optional[str]= Field(None)
     
     
 class SignalResponseDTO(BaseModel):
