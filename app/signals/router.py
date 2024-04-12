@@ -46,8 +46,8 @@ async def backtest(
 ) : #-> BacktestResponseDTO
     myuuid = uuid.uuid4()
     
-    async def long_task():
-        asyncio.run(service.get_backtest_result(
+    def execute_backtest():
+        service.get_backtest_result(
             ticker=params.ticker,
             interval=params.interval,
             period=params.period,
@@ -55,11 +55,10 @@ async def backtest(
             parameters=params.parameters,
             start=params.start,
             end=params.end,
-        ))
+        )
 
     background_tasks.add_task(
         run_in_executor,
-        long_task
+        execute_backtest
     )
-    long_task()
     return myuuid
