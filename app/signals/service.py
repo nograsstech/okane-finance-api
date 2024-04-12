@@ -66,7 +66,7 @@ async def get_signals(
         }
 
 
-async def get_backtest_result(
+def get_backtest_result(
     ticker, interval, period, strategy, parameters, start=None, end=None
 ):
     """
@@ -98,7 +98,7 @@ async def get_backtest_result(
         
     signals_df = None
     try:
-        signals_df = await calculate_signals(df, strategy, parameters)
+        signals_df = calculate_signals(df, strategy, parameters)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
     
