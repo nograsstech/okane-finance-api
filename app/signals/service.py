@@ -117,10 +117,6 @@ def get_backtest_result(
         file.close()
         os.remove("backtest.html")
     logging.info("get_backtest_result finished")
-    # write to a text file
-    with open("backtest.txt", "w") as file:
-        file.write(str(stats))
-        file.close()
     return {
         "status": HTTP_200_OK,
         "message": "Backtest results",
