@@ -5,9 +5,9 @@ loguru
 aiohttp
 pandas
 python-dotenv
-fastapi
+fastapi==0.110.1
 requests
-pydantic
+pydantic==2.6.4
 uvicorn
 yfinance
 backtesting
