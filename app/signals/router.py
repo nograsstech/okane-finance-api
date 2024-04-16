@@ -28,6 +28,7 @@ async def get_signals(
     params: SignalRequestDTO = Depends(), username: str = Depends(get_current_username)
 ) -> SignalResponseDTO:
 
+    print("RUNNING IN FASTAPI")
     data = await service.get_signals(
         ticker=params.ticker,
         interval=params.interval,
@@ -40,11 +41,13 @@ async def get_signals(
     return data
 
 
-@router.get("/backtest", status_code=HTTP_200_OK) #response_model=BacktestResponseDTO
+@router.get("/backtest", status_code=HTTP_200_OK, response_model=BacktestResponseDTO | str)
 async def backtest(
     background_tasks: BackgroundTasks, params: SignalRequestDTO = Depends()
-) : #-> BacktestResponseDTO
+) -> BacktestResponseDTO | str:  
     myuuid = uuid.uuid4()
+    
+    # Save the UUID as a new entry in the trade actions database and return the UUID
     
     def execute_backtest():
         service.get_backtest_result(

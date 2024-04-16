@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Any, Optional
+from typing import Any, Optional, Dict, Union, List
 
 class SignalRequestDTO(BaseModel):
     ticker: str = Field(...)
@@ -10,10 +10,30 @@ class SignalRequestDTO(BaseModel):
     start: Optional[str] = Field(None)
     end: Optional[str]= Field(None)
     
+class Signal(BaseModel):
+    gmtTime: str = Field(...)
+    Open: float = Field(...),
+    High: float = Field(...),
+    Low: float = Field(...),
+    Close: float = Field(...),
+    Volume: float = Field(...),
+    TotalSignal: float = Field(...),
     
+class SignalsDict(BaseModel):
+    latest_signal: Signal = Field(...)
+    all_signals: List[Signal] = Field(...)
+    
+class SignalRequestData(BaseModel):
+    ticker: str
+    period: str
+    interval: str
+    strategy: str
+    signals: SignalsDict
+
 class SignalResponseDTO(BaseModel):
     status: int = Field(...)
     message: str = Field(...)
+    data: SignalRequestData = Field(...)
     
 class BacktestStats(BaseModel):
     ticker: Any

@@ -2,8 +2,9 @@ import yfinance as yf
 from fastapi import FastAPI, HTTPException
 from app.base.utils.mongodb import connect_mongodb, COLLECTIONS
 from starlette.status import HTTP_200_OK
-from app.signals.utils.yfinance import getYFinanceData
-from app.signals.strategies.calculate import calculate_signals
+from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
+from app.signals.utils.signals import get_latest_signal, get_all_signals
+from app.signals.strategies.calculate import calculate_signals, calculate_signals_async
 from app.signals.strategies.ema_bollinger_backtest import backtest
 import json
 import os
@@ -33,37 +34,42 @@ async def get_signals(
     """
     df = None
     try:
-        df = getYFinanceData(ticker, interval, period, start, end);
+        df = await getYFinanceDataAsync(ticker, interval, period, start, end);
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch data from Yahoo Finance. Error: {e}")
+        print("1")
+        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         
     signals_df = None
     try:
-        signals_df = await calculate_signals(df, strategy, parameters)
+        signals_df = await calculate_signals_async(df, strategy, parameters)
     except Exception as e:
+        print("2")
         raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         
     current_signal = signals_df.iloc[-1]
     current_signal = json.loads(current_signal.to_json())
     
-    if current_signal == 2:
-        return {
-            "status": HTTP_200_OK,
-            "message": "Buy",
-            "data": {"ticker": ticker, "signal": current_signal},
-        }
-    elif current_signal == 1:
-        return {
-            "status": HTTP_200_OK,
-            "message": "Sell",
-            "data": {"ticker": ticker, "signal": current_signal},
-        }
-    else:
-        return {
-            "status": HTTP_200_OK,
-            "message": "No signals",
-            "data": {"ticker": ticker, "signal": current_signal},
-        }
+    
+    # Get the latest signal
+    latest_signal = get_latest_signal(signals_df)
+    
+    # All Signals
+    all_signals = get_all_signals(signals_df)
+    
+    return {
+        "status": HTTP_200_OK,
+        "message": "Signals",
+        "data": {
+            "ticker": ticker,
+            "period": period,
+            "interval": interval,
+            "strategy": strategy,
+            "signals": {
+                "latest_signal": latest_signal,
+                "all_signals": all_signals,
+            }
+        },
+    }
 
 
 def get_backtest_result(
@@ -94,12 +100,14 @@ def get_backtest_result(
     try:
         df = getYFinanceData(ticker, interval, period, start, end);
     except Exception as e:
+        print("3")
         raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         
     signals_df = None
     try:
         signals_df = calculate_signals(df, strategy, parameters)
     except Exception as e:
+        print("4")
         raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
     
     bt, stats, heatmap = backtest(signals_df, {
