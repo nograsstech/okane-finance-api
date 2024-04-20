@@ -6,6 +6,7 @@ from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
 from app.signals.utils.signals import get_latest_signal, get_all_signals
 from app.signals.strategies.calculate import calculate_signals, calculate_signals_async
 from app.signals.strategies.ema_bollinger_backtest import backtest
+from utils.supabase_client import supabase
 import json
 import os
 import logging
@@ -36,14 +37,12 @@ async def get_signals(
     try:
         df = await getYFinanceDataAsync(ticker, interval, period, start, end);
     except Exception as e:
-        print("1")
         raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         
     signals_df = None
     try:
         signals_df = await calculate_signals_async(df, strategy, parameters)
     except Exception as e:
-        print("2")
         raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         
     current_signal = signals_df.iloc[-1]
@@ -94,7 +93,6 @@ def get_backtest_result(
         Exception: If there is an error fetching data from Yahoo Finance or calculating signals.
 
     """
-    print("I am running the backtest")
     logging.info("get_backtest_result started")
     df = None
     try:
@@ -110,7 +108,8 @@ def get_backtest_result(
         print("4")
         raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
     
-    bt, stats, heatmap = backtest(signals_df, {
+    bt, stats, heatmap, trade_actions = backtest(signals_df, {
+        "best": False,
         "size": 0.03,
         "slcoef": 2.2,
         "tpslRatio": 2.0
@@ -125,6 +124,44 @@ def get_backtest_result(
         file.close()
         os.remove("backtest.html")
     logging.info("get_backtest_result finished")
+    
+    print("Original trade actions")
+    print(len(trade_actions))
+    
+    # add the backtest_id
+    for trade_action in trade_actions:
+        trade_action["backtest_id"] = 15
+    
+    try:
+        latest_trade_action = supabase.table('trade_actions').select("*").order('datetime', desc=True).limit(1).execute()
+        print("----Latest Trade Action----")
+        print(latest_trade_action)
+        
+        print("----New Trade Actions----")
+        if (len(latest_trade_action.data) > 0):
+            # filter only records where the datetime is newer than latest_trade_action.data[0]['datetime']
+            trade_actions = [trade_action for trade_action in trade_actions if trade_action['datetime'] > latest_trade_action.data[0]['datetime']]
+        
+        print(len(trade_actions))
+    except Exception as e:
+        logging.error(f"Failed to get the latest trade action from the database. Error: {e}")
+        
+    
+    # Save trade actions to the database
+    try:
+        print("Start inserting data to DB")
+        trade_actions = supabase.table('trade_actions').insert(trade_actions).execute()
+        print("Result")
+        logging.info(f"Trade actions saved to the database.")
+    except Exception as e:
+        logging.error(f"Failed to save trade actions to the database. Error: {e}")
+    
+    
+    
+    # Save backtest stats to the database
+    
+    # Return the response. No longer need to send the HTML payload since it will be saved to DB. 
+    # Just return the id of those records
     return {
         "status": HTTP_200_OK,
         "message": "Backtest results",
@@ -156,6 +193,7 @@ def get_backtest_result(
             "max_trade_duration": stats["Max. Trade Duration"],
             "average_trade_duration": stats["Avg. Trade Duration"],
             "profit_factor": round(float(stats["Profit Factor"]), 3),
+            "trade_actions": trade_actions,
             "html": html_content
         },
     }
