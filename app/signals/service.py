@@ -277,7 +277,7 @@ def get_backtest_result(
         logging.info(trade_actions)
         try:
             send_trade_action_notification(
-                ticker=ticker, interval=interval, trade_actions=trade_actions
+                strategy=strategy, ticker=ticker, interval=interval, trade_actions=trade_actions
             )
         except Exception as e:
             logging.error(f"Failed to send LINE notification. Error: {e}")

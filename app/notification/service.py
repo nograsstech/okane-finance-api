@@ -34,7 +34,7 @@ def send_line_notification(messages: List[str]) -> None:
 
 
 def send_trade_action_notification(
-    ticker: str, interval: str, trade_actions: List[TradeAction]
+    strategy: str, ticker: str, interval: str, trade_actions: List[TradeAction]
 ):
     """
     Sends a trade action notification to a LINE group.
@@ -55,21 +55,21 @@ def send_trade_action_notification(
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🟢 BUY signal\n\n📈 Symbol: {ticker}\n⏰ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
+                    "text": f"🟢 BUY signal\n\n🧠 Strategy: {strategy} 📈 Symbol: {ticker}\n⏰ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
                 }
             )
         elif action['trade_action'] == "sell":
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🔴 SELL signal\n\n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
+                    "text": f"🔴 SELL signal\n\n🧠 Strategy: {strategy} 📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
                 }
             )
         elif action['trade_action'] == "close":
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🟡 CLOSE signal\n\n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nClose Price: {action['price']}",
+                    "text": f"🟡 CLOSE signal\n\n🧠 Strategy: {strategy} 📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nClose Price: {action['price']}",
                 }
             )
 
