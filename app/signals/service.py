@@ -1,4 +1,5 @@
 import yfinance as yf
+from fastapi import APIRouter, Depends, BackgroundTasks
 from fastapi import FastAPI, HTTPException
 from app.base.utils.mongodb import connect_mongodb, COLLECTIONS
 from starlette.status import HTTP_200_OK
@@ -8,9 +9,25 @@ from app.signals.strategies.calculate import calculate_signals, calculate_signal
 from app.signals.strategies.ema_bollinger_backtest import backtest
 from utils.supabase_client import supabase
 from app.notification.service import send_trade_action_notification
+from app.signals.dto import SignalRequestDTO
+from concurrent.futures import ThreadPoolExecutor
+from typing import List
 import json
 import os
 import logging
+import asyncio
+import datetime
+
+executor = ThreadPoolExecutor(max_workers=5)
+
+
+def run_in_executor(func, *args, **kwargs):
+    def wrapper():
+        return func(*args, **kwargs)
+
+    loop = asyncio.new_event_loop()
+    return asyncio.ensure_future(loop.run_in_executor(executor, wrapper))
+
 
 async def get_signals(
     ticker, interval, period, strategy, parameters, start=None, end=None
@@ -75,7 +92,16 @@ async def get_signals(
 
 
 def get_backtest_result(
-    ticker, interval, period, strategy, parameters, start=None, end=None, strategy_id=None, backtest_process_uuid=None
+    ticker,
+    interval,
+    period,
+    strategy,
+    parameters,
+    start=None,
+    end=None,
+    strategy_id=None,
+    backtest_process_uuid=None,
+    notifications_on=False,
 ):
     """
     Get the backtest result for a given ticker, interval, period, strategy, and parameters.
@@ -138,7 +164,7 @@ def get_backtest_result(
 
     try:
         latest_trade_action = None
-        if (strategy_id != None):
+        if strategy_id != None:
             latest_trade_action = (
                 supabase.table("trade_actions")
                 .select("*")
@@ -156,10 +182,11 @@ def get_backtest_result(
                 trade_actions = [
                     trade_action
                     for trade_action in trade_actions
-                    if trade_action["datetime"] > latest_trade_action.data[0]["datetime"]
+                    if trade_action["datetime"]
+                    > latest_trade_action.data[0]["datetime"]
                 ]
             else:
-              trade_actions = trade_actions[-1:]
+                trade_actions = trade_actions[-1:]
         else:
             trade_actions = trade_actions[-1:]
 
@@ -168,15 +195,15 @@ def get_backtest_result(
         logging.error(
             f"Failed to get the latest trade action from the database. Error: {e}"
         )
-        
+
     ### Saving data to the database ###
-        
+
     # Save backtest stats to the database
     backtest_stats = {
         "ticker": ticker,
         "max_drawdown_percentage": round(float(stats["Max. Drawdown [%]"]), 3),
-        "start_time": stats["Start"].strftime('%Y-%m-%d %H:%M:%S.%f'),
-        "end_time": stats["End"].strftime('%Y-%m-%d %H:%M:%S.%f'),
+        "start_time": stats["Start"].strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "end_time": stats["End"].strftime("%Y-%m-%d %H:%M:%S.%f"),
         "duration": str(stats["Duration"]),
         "exposure_time_percentage": round(float(stats["Exposure Time [%]"]), 3),
         "final_equity": round(float(stats["Equity Final [$]"]), 3),
@@ -205,29 +232,36 @@ def get_backtest_result(
         "period": period,
         "interval": interval,
         "ref_id": backtest_process_uuid,
+        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
     }
-    if (strategy_id != None):
+    if strategy_id != None:
         backtest_stats["id"] = strategy_id
-    
+
     updated_backtest_stats = None
     try:
         logging.info(f"Saving backtest stats to the database. Ticker: {ticker}")
-        if (strategy_id != None):
-            updated_backtest_stats = supabase.table('backtest_stats').upsert(backtest_stats).execute()
+        if strategy_id != None:
+            updated_backtest_stats = (
+                supabase.table("backtest_stats").upsert(backtest_stats).execute()
+            )
         else:
-            updated_backtest_stats = supabase.table('backtest_stats').insert([backtest_stats]).execute()
+            updated_backtest_stats = (
+                supabase.table("backtest_stats").insert([backtest_stats]).execute()
+            )
     except Exception as e:
         logging.error(f"Failed to save backtest stats to the database. Error: {e}")
-        
+
     # Add backtest_id to trade_actions
     # add the backtest_id
     try:
         for trade_action in trade_actions:
-          if (updated_backtest_stats != None and updated_backtest_stats.data[0]['id'] != None):
-            trade_action["backtest_id"] = updated_backtest_stats.data[0]['id']
+            if (
+                updated_backtest_stats != None
+                and updated_backtest_stats.data[0]["id"] != None
+            ):
+                trade_action["backtest_id"] = updated_backtest_stats.data[0]["id"]
     except Exception as e:
         logging.error(f"Failed to add backtest_id to trade_actions. Error: {e}")
-
 
     # Save trade actions to the database
     try:
@@ -238,15 +272,15 @@ def get_backtest_result(
         logging.error(f"Failed to save trade actions to the database. Error: {e}")
 
     # Send notifications for new trade actions
-    logging.info("Sending trade action notification to LINE group...")
-    logging.info(trade_actions)
-    try:
-        send_trade_action_notification(
-            ticker=ticker, interval=interval, trade_actions=trade_actions
-        )
-    except Exception as e:
-        logging.error(f"Failed to send LINE notification. Error: {e}")
-
+    if notifications_on:
+        logging.info("Sending trade action notification to LINE group...")
+        logging.info(trade_actions)
+        try:
+            send_trade_action_notification(
+                ticker=ticker, interval=interval, trade_actions=trade_actions
+            )
+        except Exception as e:
+            logging.error(f"Failed to send LINE notification. Error: {e}")
 
     # Return the response. No longer need to send the HTML payload since it will be saved to DB.
     # Just return the id of those records
@@ -255,3 +289,44 @@ def get_backtest_result(
         "message": "Backtest results",
         "data": backtest_process_uuid,
     }
+
+
+def strategy_notification_job():
+    """
+    Send a notification for the specified strategies.
+
+    Args:
+        strategy_id_list (List[SignalRequestDTO]): A list of strategy IDs for which to send notifications.
+
+    Returns:
+        None
+
+    -- Supabase AI is experimental and may produce incorrect answers
+    -- Always verify the output before executing
+    
+    """
+    # Perform the inner query
+    query = supabase.table("unique_strategies").select("*")
+    response = query.execute()
+
+    logging.info(response.data)
+
+    for strategy in response.data:
+        logging.info(
+            f"Updating strategy backtest. Ticker: {strategy['ticker']}, Strategy: {strategy['strategy']}, Period: {strategy['period']}, Interval: {strategy['interval']}"
+        )
+        # Send a notification for the strategy
+        try:
+            get_backtest_result(
+                ticker=strategy['ticker'],
+                interval=strategy['interval'],
+                period=strategy['period'],
+                strategy=strategy['strategy'],
+                parameters=None,
+                start=None,
+                end=None,
+                strategy_id=strategy['id'],
+                notifications_on=strategy['notifications_on'],
+            )
+        except Exception as e:
+            logging.error(f"Failed to send notification for strategy. Error: {e}")

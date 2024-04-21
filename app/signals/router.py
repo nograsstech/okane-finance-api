@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
+from typing import List
 from dotenv import load_dotenv
 from app.signals.dto import SignalRequestDTO, SignalResponseDTO, BacktestResponseDTO, BacktestProcessResponseDTO
 from app.signals import service
@@ -89,3 +90,18 @@ async def backtest(
         )
         
     return execute_backtest()
+
+@router.post("/strategy-notification-job", status_code=HTTP_200_OK)
+async def strategy_notification(
+    # strategy_id_list: List[SignalRequestDTO]
+    background_tasks: BackgroundTasks
+) -> None:  
+    def execute_backtest():
+        service.strategy_notification_job()
+        
+    background_tasks.add_task(
+        run_in_executor,
+        execute_backtest
+    )
+    
+    return None
