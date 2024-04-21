@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
 from dotenv import load_dotenv
-from app.signals.dto import SignalRequestDTO, SignalResponseDTO, BacktestResponseDTO
+from app.signals.dto import SignalRequestDTO, SignalResponseDTO, BacktestResponseDTO, BacktestProcessResponseDTO
 from app.signals import service
 from starlette.status import HTTP_200_OK
 from app.auth.basic_auth import get_current_username
@@ -46,8 +46,8 @@ async def get_signals(
 @router.get("/backtest", status_code=HTTP_200_OK, response_model=str)
 async def backtest(
     background_tasks: BackgroundTasks, params: SignalRequestDTO = Depends()
-) -> str:  
-    myuuid = uuid.uuid4()
+) -> BacktestProcessResponseDTO:  
+    backtest_process_uuid = uuid.uuid4()
     
     # Save the UUID as a new entry in the trade actions database and return the UUID
     
@@ -60,13 +60,15 @@ async def backtest(
             parameters=params.parameters,
             start=params.start,
             end=params.end,
+            strategy_id=params.strategy_id,
+            backtest_process_uuid=params.backtest_process_uuid
         )
 
     background_tasks.add_task(
         run_in_executor,
         execute_backtest
     )
-    return str(myuuid)
+    return str(backtest_process_uuid)
 
 @router.get("/backtest/sync", status_code=HTTP_200_OK, response_model=BacktestResponseDTO)
 async def backtest(

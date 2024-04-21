@@ -7,10 +7,10 @@ from app.signals.utils.signals import get_latest_signal, get_all_signals
 from app.signals.strategies.calculate import calculate_signals, calculate_signals_async
 from app.signals.strategies.ema_bollinger_backtest import backtest
 from utils.supabase_client import supabase
+from app.notification.service import send_trade_action_notification
 import json
 import os
 import logging
-logging.basicConfig(level=logging.INFO)
 
 async def get_signals(
     ticker, interval, period, strategy, parameters, start=None, end=None
@@ -35,26 +35,29 @@ async def get_signals(
     """
     df = None
     try:
-        df = await getYFinanceDataAsync(ticker, interval, period, start, end);
+        df = await getYFinanceDataAsync(ticker, interval, period, start, end)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
-        
+        raise HTTPException(
+            status_code=400, detail=f"Failed to calculate signals. Error: {e}"
+        )
+
     signals_df = None
     try:
         signals_df = await calculate_signals_async(df, strategy, parameters)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
-        
+        raise HTTPException(
+            status_code=400, detail=f"Failed to calculate signals. Error: {e}"
+        )
+
     current_signal = signals_df.iloc[-1]
     current_signal = json.loads(current_signal.to_json())
-    
-    
+
     # Get the latest signal
     latest_signal = get_latest_signal(signals_df)
-    
+
     # All Signals
     all_signals = get_all_signals(signals_df)
-    
+
     return {
         "status": HTTP_200_OK,
         "message": "Signals",
@@ -66,13 +69,13 @@ async def get_signals(
             "signals": {
                 "latest_signal": latest_signal,
                 "all_signals": all_signals,
-            }
+            },
         },
     }
 
 
 def get_backtest_result(
-    ticker, interval, period, strategy, parameters, start=None, end=None
+    ticker, interval, period, strategy, parameters, start=None, end=None, strategy_id=None, backtest_process_uuid=None
 ):
     """
     Get the backtest result for a given ticker, interval, period, strategy, and parameters.
@@ -85,6 +88,8 @@ def get_backtest_result(
         parameters (dict): The parameters specific to the strategy.
         start (str, optional): The start date of the backtest period (YYYY-MM-DD). Defaults to None.
         end (str, optional): The end date of the backtest period (YYYY-MM-DD). Defaults to None.
+        strategy_id (str, optional): The ID of the strategy. Defaults to None.
+        backtest_process_uuid (str, optional): The UUID of the backtest process. Defaults to None.
 
     Returns:
         dict: A dictionary containing the backtest results.
@@ -96,110 +101,157 @@ def get_backtest_result(
     logging.info("get_backtest_result started")
     df = None
     try:
-        df = getYFinanceData(ticker, interval, period, start, end);
+        df = getYFinanceData(ticker, interval, period, start, end)
     except Exception as e:
-        print("3")
-        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
-        
+        raise HTTPException(
+            status_code=400, detail=f"Failed to calculate signals. Error: {e}"
+        )
+
     signals_df = None
     try:
         signals_df = calculate_signals(df, strategy, parameters)
     except Exception as e:
-        print("4")
-        raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
-    
-    bt, stats, heatmap, trade_actions = backtest(signals_df, {
-        "best": False,
-        "size": 0.03,
-        "slcoef": 2.2,
-        "tpslRatio": 2.0
-    })
-    
-    # Get the 
+        raise HTTPException(
+            status_code=400, detail=f"Failed to calculate signals. Error: {e}"
+        )
+
+    bt, stats, heatmap, trade_actions = backtest(
+        signals_df, {"best": False, "size": 0.03, "slcoef": 2.2, "tpslRatio": 2.0}
+    )
+
+    # Get the
     bt.plot(open_browser=False, filename="backtest.html")
-     # Read the HTML content
+    # Read the HTML content
     with open("backtest.html", "r") as file:
         html_content = file.read()
         # delete the html file
         file.close()
         os.remove("backtest.html")
     logging.info("get_backtest_result finished")
-    
+
     print("Original trade actions")
     print(len(trade_actions))
-    
+
     # add the backtest_id
     for trade_action in trade_actions:
-        trade_action["backtest_id"] = 15
-    
+        trade_action["backtest_id"] = strategy_id
+
     try:
-        latest_trade_action = supabase.table('trade_actions').select("*").order('datetime', desc=True).limit(1).execute()
-        print("----Latest Trade Action----")
-        print(latest_trade_action)
-        
-        print("----New Trade Actions----")
-        if (len(latest_trade_action.data) > 0):
-            # filter only records where the datetime is newer than latest_trade_action.data[0]['datetime']
-            trade_actions = [trade_action for trade_action in trade_actions if trade_action['datetime'] > latest_trade_action.data[0]['datetime']]
-        
+        latest_trade_action = None
+        if (strategy_id != None):
+            latest_trade_action = (
+                supabase.table("trade_actions")
+                .select("*")
+                .eq("backtest_id", strategy_id)
+                .order("datetime", desc=True)
+                .limit(1)
+                .execute()
+            )
+            print("----Latest Trade Action----")
+            print(latest_trade_action)
+
+            print("----New Trade Actions----")
+            if len(latest_trade_action.data) > 0:
+                # filter only records where the datetime is newer than latest_trade_action.data[0]['datetime']
+                trade_actions = [
+                    trade_action
+                    for trade_action in trade_actions
+                    if trade_action["datetime"] > latest_trade_action.data[0]["datetime"]
+                ]
+            else:
+              trade_actions = trade_actions[-1:]
+        else:
+            trade_actions = trade_actions[-1:]
+
         print(len(trade_actions))
     except Exception as e:
-        logging.error(f"Failed to get the latest trade action from the database. Error: {e}")
+        logging.error(
+            f"Failed to get the latest trade action from the database. Error: {e}"
+        )
         
+    ### Saving data to the database ###
+        
+    # Save backtest stats to the database
+    backtest_stats = {
+        "ticker": ticker,
+        "max_drawdown_percentage": round(float(stats["Max. Drawdown [%]"]), 3),
+        "start_time": stats["Start"].strftime('%Y-%m-%d %H:%M:%S.%f'),
+        "end_time": stats["End"].strftime('%Y-%m-%d %H:%M:%S.%f'),
+        "duration": str(stats["Duration"]),
+        "exposure_time_percentage": round(float(stats["Exposure Time [%]"]), 3),
+        "final_equity": round(float(stats["Equity Final [$]"]), 3),
+        "peak_equity": round(float(stats["Equity Peak [$]"]), 3),
+        "return_percentage": round(float(stats["Return [%]"]), 3),
+        "buy_and_hold_return": round(float(stats["Buy & Hold Return [%]"]), 3),
+        "return_annualized": round(float(stats["Return (Ann.) [%]"]), 3),
+        "volatility_annualized": round(float(stats["Volatility (Ann.) [%]"]), 3),
+        "sharpe_ratio": round(float(stats["Sharpe Ratio"]), 3),
+        "sortino_ratio": round(float(stats["Sortino Ratio"]), 3),
+        "calmar_ratio": round(float(stats["Calmar Ratio"]), 3),
+        "max_drawdown_percentage": round(float(stats["Max. Drawdown [%]"]), 3),
+        "average_drawdown_percentage": round(float(stats["Avg. Drawdown [%]"]), 3),
+        "max_drawdown_duration": str(stats["Max. Drawdown Duration"]),
+        "average_drawdown_duration": str(stats["Avg. Drawdown Duration"]),
+        "trade_count": stats["# Trades"],
+        "win_rate": round(float(stats["Win Rate [%]"]), 3),
+        "best_trade": round(float(stats["Best Trade [%]"]), 3),
+        "worst_trade": round(float(stats["Worst Trade [%]"]), 3),
+        "avg_trade": round(float(stats["Avg. Trade [%]"]), 3),
+        "max_trade_duration": str(stats["Max. Trade Duration"]),
+        "average_trade_duration": str(stats["Avg. Trade Duration"]),
+        "profit_factor": round(float(stats["Profit Factor"]), 3),
+        "html": html_content,
+        "strategy": strategy,
+        "period": period,
+        "interval": interval,
+        "ref_id": backtest_process_uuid,
+    }
+    if (strategy_id != None):
+        backtest_stats["id"] = strategy_id
     
+    updated_backtest_stats = None
+    try:
+        logging.info(f"Saving backtest stats to the database. Ticker: {ticker}")
+        if (strategy_id != None):
+            updated_backtest_stats = supabase.table('backtest_stats').upsert(backtest_stats).execute()
+        else:
+            updated_backtest_stats = supabase.table('backtest_stats').insert([backtest_stats]).execute()
+    except Exception as e:
+        logging.error(f"Failed to save backtest stats to the database. Error: {e}")
+        
+    # Add backtest_id to trade_actions
+    # add the backtest_id
+    try:
+        for trade_action in trade_actions:
+          if (updated_backtest_stats != None and updated_backtest_stats.data[0]['id'] != None):
+            trade_action["backtest_id"] = updated_backtest_stats.data[0]['id']
+    except Exception as e:
+        logging.error(f"Failed to add backtest_id to trade_actions. Error: {e}")
+
+
     # Save trade actions to the database
     try:
-        print("Start inserting data to DB")
-        trade_actions = supabase.table('trade_actions').insert(trade_actions).execute()
-        print("Result")
+        logging.info(f"Saving trade actions to the database. Ticker: {ticker}")
+        trade_actions = supabase.table("trade_actions").insert(trade_actions).execute()
         logging.info(f"Trade actions saved to the database.")
     except Exception as e:
         logging.error(f"Failed to save trade actions to the database. Error: {e}")
-    
-    
-    
-    # Save backtest stats to the database
-    
-    # Return the response. No longer need to send the HTML payload since it will be saved to DB. 
+
+    # Send notifications for new trade actions
+    logging.info("Sending trade action notification to LINE group...")
+    logging.info(trade_actions)
+    try:
+        send_trade_action_notification(
+            ticker=ticker, interval=interval, trade_actions=trade_actions
+        )
+    except Exception as e:
+        logging.error(f"Failed to send LINE notification. Error: {e}")
+
+
+    # Return the response. No longer need to send the HTML payload since it will be saved to DB.
     # Just return the id of those records
     return {
         "status": HTTP_200_OK,
         "message": "Backtest results",
-        "data": {
-            "ticker": ticker,
-            "max_drawdown_percentage": round(float(stats["Max. Drawdown [%]"]), 3),
-            "start_time": stats["Start"],
-            "end_time": stats["End"],
-            "duration": stats["Duration"],
-            "exposure_time_percentage": round(float(stats["Exposure Time [%]"]), 3),
-            "final_equity": round(float(stats["Equity Final [$]"]), 3),
-            "peak_equity": round(float(stats["Equity Peak [$]"]), 3),
-            "return_percentage": round(float(stats["Return [%]"]), 3),
-            "buy_and_hold_return": round(float(stats["Buy & Hold Return [%]"]), 3),
-            "return_annualized": round(float(stats["Return (Ann.) [%]"]), 3),
-            "volatility_annualized": round(float(stats["Volatility (Ann.) [%]"]), 3),
-            "sharpe_ratio": round(float(stats["Sharpe Ratio"]), 3),
-            "sortino_ratio": round(float(stats["Sortino Ratio"]), 3),
-            "calmar_ratio": round(float(stats["Calmar Ratio"]), 3),
-            "max_drawdown_percentage": round(float(stats["Max. Drawdown [%]"]), 3),
-            "average_drawdown_percentage": round(float(stats["Avg. Drawdown [%]"]), 3),
-            "max_drawdown_duration": stats["Max. Drawdown Duration"],
-            "average_drawdown_duration": stats["Avg. Drawdown Duration"],
-            "trade_count": stats["# Trades"],
-            "win_rate": round(float(stats["Win Rate [%]"]), 3),
-            "best_trade": round(float(stats["Best Trade [%]"]), 3),
-            "worst_trade": round(float(stats["Worst Trade [%]"]), 3),
-            "avg_trade": round(float(stats["Avg. Trade [%]"]), 3),
-            "max_trade_duration": stats["Max. Trade Duration"],
-            "average_trade_duration": stats["Avg. Trade Duration"],
-            "profit_factor": round(float(stats["Profit Factor"]), 3),
-            "trade_actions": trade_actions,
-            "html": html_content
-        },
+        "data": backtest_process_uuid,
     }
-    
-
-        
-    
-        
-    

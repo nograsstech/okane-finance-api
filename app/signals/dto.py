@@ -9,6 +9,8 @@ class SignalRequestDTO(BaseModel):
     parameters: Optional[str] = Field(None)
     start: Optional[str] = Field(None)
     end: Optional[str]= Field(None)
+    strategy_id: Optional[str] = Field(None)
+    backtest_process_uuid: Optional[str] = Field(None)
     
 class Signal(BaseModel):
     gmtTime: str = Field(...)
@@ -68,3 +70,20 @@ class BacktestResponseDTO(BaseModel):
     status: int = Field(...)
     message: str = Field(...)
     data: BacktestStats = Field(...)
+    
+class BacktestProcessResponseDTO(BaseModel):
+    status: int = Field(...)
+    message: str = Field(...)
+    data: str = Field(...)
+
+class TradeAction(BaseModel):
+    backtest_id: int = Field(...)
+    datetime: str = Field(...)
+    trade_action: str = Field(...)
+    entry_price: float = Field(...)
+    price: float = Field(...)
+    sl: float = Field(...)
+    tp: float = Field(...)
+    size: float = Field(...)
+    
+    
