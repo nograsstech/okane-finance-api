@@ -255,11 +255,13 @@ def get_backtest_result(
     # add the backtest_id
     try:
         for trade_action in trade_actions:
+            # Add the backtest_stat id (foreign key) to the trade action 
             if (
                 updated_backtest_stats != None
                 and updated_backtest_stats.data[0]["id"] != None
             ):
-                trade_action["backtest_id"] = updated_backtest_stats.data[0]["id"]
+                trade_action["backtest_id"] = updated_backtest_stats.data[0]["id"]            
+            
     except Exception as e:
         logging.error(f"Failed to add backtest_id to trade_actions. Error: {e}")
 

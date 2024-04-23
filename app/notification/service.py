@@ -55,21 +55,21 @@ def send_trade_action_notification(
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🟢 BUY signal\n\n🧠 Strategy: {strategy} 📈 Symbol: {ticker}\n⏰ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
+                    "text": f"🟢 BUY signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏰ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
                 }
             )
         elif action['trade_action'] == "sell":
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🔴 SELL signal\n\n🧠 Strategy: {strategy} 📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
+                    "text": f"🔴 SELL signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
                 }
             )
         elif action['trade_action'] == "close":
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🟡 CLOSE signal\n\n🧠 Strategy: {strategy} 📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nClose Price: {action['price']}",
+                    "text": f"🟡 CLOSE signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nClose Price: {action['price']}",
                 }
             )
 
