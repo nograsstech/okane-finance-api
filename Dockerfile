@@ -1,5 +1,5 @@
 # Choose the Python version you want
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 
 # Create a working directory
 WORKDIR /app

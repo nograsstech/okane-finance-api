@@ -97,7 +97,7 @@ def backtest(df, strategy_parameters):
     stats, heatmap = bt.optimize(
         slcoef=[i / 10 for i in range(10, 41, 2)],
         TPSLRatio=[i / 10 for i in range(10, 31, 2)],
-        maximize="Return [%]",
+        maximize="Sharpe Ratio",
         max_tries=300,
         random_state=0,
         return_heatmap=True,

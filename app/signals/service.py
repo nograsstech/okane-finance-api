@@ -6,7 +6,9 @@ from starlette.status import HTTP_200_OK
 from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
 from app.signals.utils.signals import get_latest_signal, get_all_signals
 from app.signals.strategies.calculate import calculate_signals, calculate_signals_async
-from app.signals.strategies.ema_bollinger_backtest import backtest
+
+# from app.signals.strategies.ema_bollinger_backtest import backtest
+from app.signals.strategies.perform_backtest import perform_backtest
 from utils.supabase_client import supabase
 from app.notification.service import send_trade_action_notification
 from app.signals.dto import SignalRequestDTO
@@ -126,23 +128,37 @@ def get_backtest_result(
     """
     logging.info("get_backtest_result started")
     df = None
+    df1d = None
     try:
         df = getYFinanceData(ticker, interval, period, start, end)
+        if (strategy == "macd_1"):
+            df1d = getYFinanceData(ticker, "1d", period, start, end)
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
         )
+
+    parameters_dict = json.loads(parameters)
 
     signals_df = None
     try:
-        signals_df = calculate_signals(df, strategy, parameters)
+        signals_df = calculate_signals(df, df1d, strategy, parameters_dict)
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
         )
 
-    bt, stats, heatmap, trade_actions = backtest(
-        signals_df, {"best": False, "size": 0.03, "slcoef": 2.2, "tpslRatio": 2.0}
+    bt, stats, heatmap, trade_actions = perform_backtest(
+        signals_df,
+        strategy,
+        {
+            "best": False,
+            "size": 0.03,
+            "slcoef": 2.2,
+            "tpslRatio": 2.0,
+            "max_longs": parameters_dict.get("max_longs", 1),
+            "max_shorts": parameters_dict.get("max_shorts", 1),
+        },
     )
 
     # Get the
@@ -255,19 +271,21 @@ def get_backtest_result(
     # add the backtest_id
     try:
         for trade_action in trade_actions:
-            # Add the backtest_stat id (foreign key) to the trade action 
+            # Add the backtest_stat id (foreign key) to the trade action
             if (
                 updated_backtest_stats != None
                 and updated_backtest_stats.data[0]["id"] != None
             ):
-                trade_action["backtest_id"] = updated_backtest_stats.data[0]["id"]            
-            
+                trade_action["backtest_id"] = updated_backtest_stats.data[0]["id"]
+
     except Exception as e:
         logging.error(f"Failed to add backtest_id to trade_actions. Error: {e}")
 
     # Save trade actions to the database
     try:
         logging.info(f"Saving trade actions to the database. Ticker: {ticker}")
+        print("--- Inserting Trade Actions to DB")
+        print(trade_actions)
         trade_actions = supabase.table("trade_actions").insert(trade_actions).execute()
         logging.info(f"Trade actions saved to the database.")
     except Exception as e:
@@ -279,7 +297,10 @@ def get_backtest_result(
         logging.info(trade_actions)
         try:
             send_trade_action_notification(
-                strategy=strategy, ticker=ticker, interval=interval, trade_actions=trade_actions
+                strategy=strategy,
+                ticker=ticker,
+                interval=interval,
+                trade_actions=trade_actions,
             )
         except Exception as e:
             logging.error(f"Failed to send LINE notification. Error: {e}")
@@ -305,7 +326,7 @@ def strategy_notification_job():
 
     -- Supabase AI is experimental and may produce incorrect answers
     -- Always verify the output before executing
-    
+
     """
     # Perform the inner query
     query = supabase.table("unique_strategies").select("*")
@@ -320,15 +341,15 @@ def strategy_notification_job():
         # Send a notification for the strategy
         try:
             get_backtest_result(
-                ticker=strategy['ticker'],
-                interval=strategy['interval'],
-                period=strategy['period'],
-                strategy=strategy['strategy'],
-                parameters=None,
+                ticker=strategy["ticker"],
+                interval=strategy["interval"],
+                period=strategy["period"],
+                strategy=strategy["strategy"],
+                parameters='{"max_longs": 2, "max_shorts": 2}', # temporary
                 start=None,
                 end=None,
-                strategy_id=strategy['id'],
-                notifications_on=strategy['notifications_on'],
+                strategy_id=strategy["id"],
+                notifications_on=strategy["notifications_on"],
             )
         except Exception as e:
             logging.error(f"Failed to send notification for strategy. Error: {e}")

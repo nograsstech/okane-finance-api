@@ -51,25 +51,28 @@ def send_trade_action_notification(
     logging.info(f"Trade actions: {trade_actions}")
 
     for action in trade_actions.data:
+        strategy_performance_url = f"{os.environ['OKANE_SIGNALS_URL']}/strategy/{action['backtest_id']}"
+        backtest_results_url = f"{os.environ['OKANE_SIGNALS_URL']}/strategy/{action['backtest_id']}/backtest"
+        
         if action['trade_action'] == "buy":
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🟢 BUY signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏰ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
+                    "text": f"🟢 BUY signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏰ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {str(action['entry_price'])[0:7]} \nSize: {action['size']} \nStop loss: {str(action['sl'])[0:7]} \nTake Profit: {str(action['tp'])[0:7]} \n\nStrategy: {strategy_performance_url} \n\nBacktest: {backtest_results_url}",
                 }
             )
         elif action['trade_action'] == "sell":
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🔴 SELL signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nStop loss: {action['sl']} \nTake Profit: {action['tp']}",
+                    "text": f"🔴 SELL signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {str(action['entry_price'])[0:7]} \nSize: {action['size']} \nStop loss: {str(action['sl'])[0:7]} \nTake Profit: {str(action['tp'])[0:7]} \n\nStrategy: {strategy_performance_url} \n\nBacktest: {backtest_results_url}",
                 }
             )
         elif action['trade_action'] == "close":
             messages.append(
                 {
                     "type": "text",
-                    "text": f"🟡 CLOSE signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {action['entry_price']} \nSize: {action['size']} \nClose Price: {action['price']}",
+                    "text": f"🟡 CLOSE signal\n\n🧠 Strategy: {strategy} \n📈 Symbol: {ticker}\n⏳ Interval: {interval} \n⏱️Time: {action['datetime']} (GMT) \n\n--- \nEntry: {str(action['entry_price'])[0:7]} \nSize: {action['size']} \nClose Price: {str(action['price'])[0:7]} \n\nStrategy: {strategy_performance_url} \n\nBacktest: {backtest_results_url}",
                 }
             )
 
