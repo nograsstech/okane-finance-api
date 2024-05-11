@@ -53,8 +53,11 @@ async def get_signals(
         Exception: If there is an error fetching data from Yahoo Finance or calculating signals.
     """
     df = None
+    df1d = None
     try:
         df = await getYFinanceDataAsync(ticker, interval, period, start, end)
+        if (strategy == "macd_1"):
+            df1d = getYFinanceData(ticker, "1d", period, start, end)
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
@@ -62,7 +65,7 @@ async def get_signals(
 
     signals_df = None
     try:
-        signals_df = await calculate_signals_async(df, strategy, parameters)
+        signals_df = await calculate_signals_async(df, df1d, strategy, parameters)
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
