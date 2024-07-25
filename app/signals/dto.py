@@ -65,6 +65,8 @@ class BacktestStats(BaseModel):
     average_trade_duration: Any
     profit_factor: float
     html: Any
+    tpslRatio: float
+    sl_coef: float
     
 class BacktestResponseDTO(BaseModel):
     status: int = Field(...)

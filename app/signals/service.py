@@ -18,7 +18,7 @@ import json
 import os
 import logging
 import asyncio
-import datetime
+from datetime import datetime, timezone, timedelta
 
 executor = ThreadPoolExecutor(max_workers=5)
 
@@ -107,6 +107,8 @@ def get_backtest_result(
     strategy_id=None,
     backtest_process_uuid=None,
     notifications_on=False,
+    skip_optimization=False,
+    best_params=None,
 ):
     """
     Get the backtest result for a given ticker, interval, period, strategy, and parameters.
@@ -150,18 +152,24 @@ def get_backtest_result(
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
         )
+        
+    size = 0.03
+    if (ticker == "BTC-USD"):
+        size = 0.01  
 
-    bt, stats, heatmap, trade_actions = perform_backtest(
+    bt, stats, trade_actions, strategy_parameters = perform_backtest(
         signals_df,
         strategy,
         {
             "best": False,
-            "size": 0.03,
+            "size": size,
             "slcoef": 2.2,
             "tpslRatio": 2.0,
             "max_longs": parameters_dict.get("max_longs", 1),
             "max_shorts": parameters_dict.get("max_shorts", 1),
         },
+        skip_optimization,
+        best_params,
     )
 
     # Get the
@@ -251,7 +259,10 @@ def get_backtest_result(
         "period": period,
         "interval": interval,
         "ref_id": backtest_process_uuid,
-        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "last_optimized_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "tpsl_ratio": round(float(strategy_parameters["tpslRatio"]), 3),
+        "sl_coef": round(float(strategy_parameters["slcoef"]), 3),
     }
     if strategy_id != None:
         backtest_stats["id"] = strategy_id
@@ -335,12 +346,23 @@ def strategy_notification_job():
     query = supabase.table("unique_strategies").select("*")
     response = query.execute()
 
+    print("--------------------------------------")
+    print("Preparing to run backtests and send signal notification if available. \nSignal for: ", response.data)
+    print("--------------------------------------")
     logging.info(response.data)
 
     for strategy in response.data:
         logging.info(
             f"Updating strategy backtest. Ticker: {strategy['ticker']}, Strategy: {strategy['strategy']}, Period: {strategy['period']}, Interval: {strategy['interval']}"
         )
+        
+        # Check the strategy["last_optimized_at"] and compare it with the current time. If the difference is greater than 5 days, re-optimize.
+        singapore_tz = timezone(timedelta(hours=8))
+        last_optimized_at = datetime.strptime(strategy["last_optimized_at"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        current_time = datetime.now(singapore_tz)
+        time_difference = (current_time - last_optimized_at).days
+        print("Skip optimization: ", time_difference < 3)
+
         # Send a notification for the strategy
         try:
             get_backtest_result(
@@ -353,6 +375,8 @@ def strategy_notification_job():
                 end=None,
                 strategy_id=strategy["id"],
                 notifications_on=strategy["notifications_on"],
+                skip_optimization=time_difference < 3, # Reoptimize every 3 days
+                best_params=[strategy['tpsl_ratio'], strategy['sl_coef']],
             )
         except Exception as e:
             logging.error(f"Failed to send notification for strategy. Error: {e}")

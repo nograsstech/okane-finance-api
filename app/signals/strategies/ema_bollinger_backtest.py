@@ -4,14 +4,16 @@ import multiprocessing as mp
 if mp.get_start_method(allow_none=True) != 'fork':
     mp.set_start_method('fork', force=True)
 
-def backtest(df, strategy_parameters):
+def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best_params=None):
     dftest = df[:]
     
     # TODO: make these variables parameters instead
     # trades_actions = None
     margin = 1/500
     cash = 100000
-    lot_size = 0.03
+    lot_size = size
+    
+    
 
     def SIGNAL():
         return dftest.TotalSignal
@@ -92,30 +94,35 @@ def backtest(df, strategy_parameters):
                         "size": self.mysize,
                     })
     
-    bt = Backtest(dftest, MyStrat, cash=cash, margin=margin)
+    # Do optimization if skip_optimization is False
+    if (not skip_optimization):
+        print("Optimizing...")
+        bt = Backtest(dftest, MyStrat, cash=cash, margin=margin)
 
-    stats, heatmap = bt.optimize(
-        slcoef=[i / 10 for i in range(10, 41, 2)],
-        TPSLRatio=[i / 10 for i in range(10, 31, 2)],
-        maximize="Return [%]",
-        max_tries=300,
-        random_state=0,
-        return_heatmap=True,
-    )
-    
-    # Convert multiindex series to dataframe
-    heatmap_df = heatmap.unstack()
-    # find the one best parameters from heatmap_df
-    best_params = heatmap_df.idxmax()
+        stats, heatmap = bt.optimize(
+            slcoef=[i / 10 for i in range(10, 51, 2)],
+            TPSLRatio=[i / 10 for i in range(15, 25, 2)],
+            maximize="Win Rate [%]",
+            max_tries=300,
+            random_state=0,
+            return_heatmap=True,
+        )
+        
+        # Convert multiindex series to dataframe
+        heatmap_df = heatmap.unstack()
+        # find the one best parameters from heatmap_df
+        best_params = heatmap_df.idxmax()
 
-    # Find the maximum value over the entire DataFrame
-    max_value = heatmap_df.max().max()
+        # Find the maximum value over the entire DataFrame
+        max_value = heatmap_df.max().max()
 
-    # Find the index of the maximum value
-    best_params = (heatmap_df == max_value).stack().idxmax()
+        # Find the index of the maximum value
+        best_params = (heatmap_df == max_value).stack().idxmax()
 
-    print(best_params)
-
+        print(best_params)
+    else:
+        print("Optimization is skipped and best params provided", best_params)
+        
     strategy_parameters = {
         "best": True,
         "slcoef": best_params[0],
@@ -128,9 +135,7 @@ def backtest(df, strategy_parameters):
     MyStrat.TPSLRatio = strategy_parameters["slcoef"]
     
     bt_best = Backtest(dftest, MyStrat, cash=cash, margin=margin)
-    bt_best.run()
+    stats = bt_best.run()
     trades_actions = bt_best._strategy.trades_actions
     
-    # TODO: Save the backtest result to Supabase using the refID.
-    
-    return bt, stats, heatmap, trades_actions
+    return bt_best, stats, trades_actions, strategy_parameters
