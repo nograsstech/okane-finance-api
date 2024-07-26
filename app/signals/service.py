@@ -300,15 +300,16 @@ def get_backtest_result(
         logging.info(f"Saving trade actions to the database. Ticker: {ticker}")
         print("--- Inserting Trade Actions to DB")
         print(trade_actions)
-        trade_actions = supabase.table("trade_actions").insert(trade_actions).execute()
-        logging.info(f"Trade actions saved to the database.")
+        if (len(trade_actions) > 0):
+            trade_actions = supabase.table("trade_actions").insert(trade_actions).execute()
+            print(f"Trade actions saved to the database.")
     except Exception as e:
         logging.error(f"Failed to save trade actions to the database. Error: {e}")
 
     # Send notifications for new trade actions
-    if notifications_on:
-        logging.info("Sending trade action notification to LINE group...")
-        logging.info(trade_actions)
+    if notifications_on & hasattr(trade_actions, 'data'):
+        print("Sending trade action notification to LINE group...")
+        print(trade_actions)
         try:
             send_trade_action_notification(
                 strategy=strategy,

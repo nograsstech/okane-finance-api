@@ -123,8 +123,8 @@ def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best
 
     strategy_parameters = {
         "best": True,
-        "slcoef": best_params[0],
-        "tpslRatio": best_params[1]
+        "tpslRatio": best_params[0],
+        "slcoef": best_params[1]
     }
     
     print(strategy_parameters)

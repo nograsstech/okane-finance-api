@@ -1,4 +1,4 @@
-docker build . -t okane-finance-api:latest --platform linux/amd64
+docker build . -t okane-finance-api:latest --platform linux/amd64 --no-cache
 
 docker tag okane-finance-api:latest asia-east1-docker.pkg.dev/quantitative-trading-point/moni/okane-finance-api:latest
 

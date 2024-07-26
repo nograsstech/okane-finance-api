@@ -1,6 +1,5 @@
 pymongo
 asyncio
-datetime
 loguru
 aiohttp
 pandas
@@ -9,9 +8,10 @@ fastapi==0.110.1
 requests
 pydantic==2.6.4
 uvicorn
-yfinance
+yfinance==0.2.17
 backtesting
 typing
 pandas_ta
-numpy
+numpy==1.26.4
 supabase
+bokeh==2.4.3
