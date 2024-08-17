@@ -272,11 +272,11 @@ def get_backtest_result(
         logging.info(f"Saving backtest stats to the database. Ticker: {ticker}")
         if strategy_id != None:
             updated_backtest_stats = (
-                supabase.table("backtest_stats").upsert(backtest_stats).execute()
+                supabase.table("backtest_stats").upsert(backtest_stats, returning='minimal').execute()
             )
         else:
             updated_backtest_stats = (
-                supabase.table("backtest_stats").insert([backtest_stats]).execute()
+                supabase.table("backtest_stats").insert([backtest_stats], returning='minimal').execute()
             )
     except Exception as e:
         logging.error(f"Failed to save backtest stats to the database. Error: {e}")
