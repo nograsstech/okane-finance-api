@@ -1,8 +1,10 @@
+import zlib
 import yfinance as yf
 from fastapi import APIRouter, Depends, BackgroundTasks
 from fastapi import FastAPI, HTTPException
 from app.base.utils.mongodb import connect_mongodb, COLLECTIONS
 from starlette.status import HTTP_200_OK
+from app.lib.utils.pako import pako_deflate
 from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
 from app.signals.utils.signals import get_latest_signal, get_all_signals
 from app.signals.strategies.calculate import calculate_signals, calculate_signals_async
@@ -19,6 +21,8 @@ import os
 import logging
 import asyncio
 from datetime import datetime, timezone, timedelta
+import urllib.parse
+import base64
 
 executor = ThreadPoolExecutor(max_workers=5)
 
@@ -264,6 +268,18 @@ def get_backtest_result(
         "tpsl_ratio": round(float(strategy_parameters["tpslRatio"]), 3),
         "sl_coef": round(float(strategy_parameters["slcoef"]), 3),
     }
+    
+    # Defalt the HTML content to save bandwidth and storage
+    try:
+        # Convert to bytes
+        html_bytes = html_content.encode('utf-8')
+        # Compress with zlib (default DEFLATE format)
+        compressed_data = zlib.compress(html_bytes, level=9)
+        # Encode in base64 for transmission
+        backtest_stats["html"] = base64.b64encode(compressed_data).decode('utf-8')
+    except Exception as e: 
+        logging.error("Failed to deflate the HTML content", e)
+    
     if strategy_id != None:
         backtest_stats["id"] = strategy_id
 
@@ -284,13 +300,15 @@ def get_backtest_result(
     # Add backtest_id to trade_actions
     # add the backtest_id
     try:
-        for trade_action in trade_actions:
-            # Add the backtest_stat id (foreign key) to the trade action
-            if (
-                updated_backtest_stats != None
-                and updated_backtest_stats.data[0]["id"] != None
-            ):
-                trade_action["backtest_id"] = updated_backtest_stats.data[0]["id"]
+        if updated_backtest_stats and updated_backtest_stats.data:
+            for trade_action in trade_actions:
+                print("\n\n")
+                print(trade_action, "\n\n")
+                # Add the backtest_stat id (foreign key) to the trade action
+                if updated_backtest_stats.data[0]["id"] is not None:
+                    trade_action["backtest_id"] = updated_backtest_stats.data[0]["id"]
+        else:
+            logging.error("updated_backtest_stats or updated_backtest_stats.data is empty")
 
     except Exception as e:
         logging.error(f"Failed to add backtest_id to trade_actions. Error: {e}")
