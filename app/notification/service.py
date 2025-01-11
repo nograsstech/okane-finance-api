@@ -34,7 +34,7 @@ def send_line_notification(messages: List[str]) -> None:
 
 
 def send_trade_action_notification(
-    strategy: str, ticker: str, interval: str, trade_actions: List[TradeAction]
+    strategy: str, ticker: str, interval: str, trade_actions
 ):
     """
     Sends a trade action notification to a LINE group.
@@ -47,8 +47,8 @@ def send_trade_action_notification(
     """
     messages = []
     
-    logging.info(f"Sending trade action notification for {ticker} on {interval}...")
-    logging.info(f"Trade actions: {trade_actions}")
+    print(f"Sending trade action notification for {ticker} on {interval}...")
+    print(f"Trade actions: {trade_actions.data}")
 
     for action in trade_actions.data:
         strategy_performance_url = f"{os.environ['OKANE_SIGNALS_URL']}/strategy/{action['backtest_id']}"

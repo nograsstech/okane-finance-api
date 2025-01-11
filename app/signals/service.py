@@ -18,7 +18,7 @@ import json
 import os
 import logging
 import asyncio
-import datetime
+from datetime import datetime, timezone, timedelta
 
 executor = ThreadPoolExecutor(max_workers=5)
 
@@ -53,8 +53,11 @@ async def get_signals(
         Exception: If there is an error fetching data from Yahoo Finance or calculating signals.
     """
     df = None
+    df1d = None
     try:
         df = await getYFinanceDataAsync(ticker, interval, period, start, end)
+        if (strategy == "macd_1"):
+            df1d = getYFinanceData(ticker, "1d", period, start, end)
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
@@ -62,7 +65,7 @@ async def get_signals(
 
     signals_df = None
     try:
-        signals_df = await calculate_signals_async(df, strategy, parameters)
+        signals_df = await calculate_signals_async(df, df1d, strategy, parameters)
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
@@ -104,6 +107,8 @@ def get_backtest_result(
     strategy_id=None,
     backtest_process_uuid=None,
     notifications_on=False,
+    skip_optimization=False,
+    best_params=None,
 ):
     """
     Get the backtest result for a given ticker, interval, period, strategy, and parameters.
@@ -147,18 +152,24 @@ def get_backtest_result(
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
         )
+        
+    size = 0.03
+    if (ticker == "BTC-USD"):
+        size = 0.01  
 
-    bt, stats, heatmap, trade_actions = perform_backtest(
+    bt, stats, trade_actions, strategy_parameters = perform_backtest(
         signals_df,
         strategy,
         {
             "best": False,
-            "size": 0.03,
+            "size": size,
             "slcoef": 2.2,
             "tpslRatio": 2.0,
             "max_longs": parameters_dict.get("max_longs", 1),
             "max_shorts": parameters_dict.get("max_shorts", 1),
         },
+        skip_optimization,
+        best_params,
     )
 
     # Get the
@@ -248,7 +259,10 @@ def get_backtest_result(
         "period": period,
         "interval": interval,
         "ref_id": backtest_process_uuid,
-        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "last_optimized_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "tpsl_ratio": round(float(strategy_parameters["tpslRatio"]), 3),
+        "sl_coef": round(float(strategy_parameters["slcoef"]), 3),
     }
     if strategy_id != None:
         backtest_stats["id"] = strategy_id
@@ -258,11 +272,11 @@ def get_backtest_result(
         logging.info(f"Saving backtest stats to the database. Ticker: {ticker}")
         if strategy_id != None:
             updated_backtest_stats = (
-                supabase.table("backtest_stats").upsert(backtest_stats).execute()
+                supabase.table("backtest_stats").upsert(backtest_stats, returning='minimal').execute()
             )
         else:
             updated_backtest_stats = (
-                supabase.table("backtest_stats").insert([backtest_stats]).execute()
+                supabase.table("backtest_stats").insert([backtest_stats], returning='minimal').execute()
             )
     except Exception as e:
         logging.error(f"Failed to save backtest stats to the database. Error: {e}")
@@ -286,15 +300,16 @@ def get_backtest_result(
         logging.info(f"Saving trade actions to the database. Ticker: {ticker}")
         print("--- Inserting Trade Actions to DB")
         print(trade_actions)
-        trade_actions = supabase.table("trade_actions").insert(trade_actions).execute()
-        logging.info(f"Trade actions saved to the database.")
+        if (len(trade_actions) > 0):
+            trade_actions = supabase.table("trade_actions").insert(trade_actions).execute()
+            print(f"Trade actions saved to the database.")
     except Exception as e:
         logging.error(f"Failed to save trade actions to the database. Error: {e}")
 
     # Send notifications for new trade actions
-    if notifications_on:
-        logging.info("Sending trade action notification to LINE group...")
-        logging.info(trade_actions)
+    if notifications_on & hasattr(trade_actions, 'data'):
+        print("Sending trade action notification to LINE group...")
+        print(trade_actions)
         try:
             send_trade_action_notification(
                 strategy=strategy,
@@ -332,12 +347,23 @@ def strategy_notification_job():
     query = supabase.table("unique_strategies").select("*")
     response = query.execute()
 
+    print("--------------------------------------")
+    print("Preparing to run backtests and send signal notification if available. \nSignal for: ", response.data)
+    print("--------------------------------------")
     logging.info(response.data)
 
     for strategy in response.data:
         logging.info(
             f"Updating strategy backtest. Ticker: {strategy['ticker']}, Strategy: {strategy['strategy']}, Period: {strategy['period']}, Interval: {strategy['interval']}"
         )
+        
+        # Check the strategy["last_optimized_at"] and compare it with the current time. If the difference is greater than 5 days, re-optimize.
+        singapore_tz = timezone(timedelta(hours=8))
+        last_optimized_at = datetime.strptime(strategy["last_optimized_at"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        current_time = datetime.now(singapore_tz)
+        time_difference = (current_time - last_optimized_at).days
+        print("Skip optimization: ", time_difference < 3)
+
         # Send a notification for the strategy
         try:
             get_backtest_result(
@@ -350,6 +376,8 @@ def strategy_notification_job():
                 end=None,
                 strategy_id=strategy["id"],
                 notifications_on=strategy["notifications_on"],
+                skip_optimization=time_difference < 3, # Reoptimize every 3 days
+                best_params=[strategy['tpsl_ratio'], strategy['sl_coef']],
             )
         except Exception as e:
             logging.error(f"Failed to send notification for strategy. Error: {e}")

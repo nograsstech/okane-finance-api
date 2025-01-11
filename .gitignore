@@ -1,4 +1,12 @@
-data
-*/__pycache__
+# Ignore all __pycache__ folders
+**/__pycache__/
+
+# Ignore data directory
+/data
+
+# Ignore .env files
 .env
 .env.*
+
+# Ignore virtual environment directory
+.venv/
