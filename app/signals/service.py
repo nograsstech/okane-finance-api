@@ -56,48 +56,60 @@ async def get_signals(
     Raises:
         Exception: If there is an error fetching data from Yahoo Finance or calculating signals.
     """
-    df = None
-    df1d = None
+    
     try:
-        df = await getYFinanceDataAsync(ticker, interval, period, start, end)
-        if (strategy == "macd_1"):
-            df1d = getYFinanceData(ticker, "1d", period, start, end)
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to calculate signals. Error: {e}"
-        )
+        # Fetch data from Yahoo Finance
+        df = None
+        df1d = None
+        try:
+            df = await getYFinanceDataAsync(ticker, interval, period, start, end)
+            
+            # Special adjustments for different strategies
+            if (strategy == "macd_1"):
+                df1d = getYFinanceData(ticker, "1d", period, start, end)
+                
+            # ...
+            
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to calculate signals. Error: {e}"
+            )
 
-    signals_df = None
-    try:
-        signals_df = await calculate_signals_async(df, df1d, strategy, parameters)
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to calculate signals. Error: {e}"
-        )
+        # Calculate signals
+        signals_df = None
+        try:
+            signals_df = await calculate_signals_async(df, df1d, strategy, parameters)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to calculate signals. Error: {e}"
+            )
+        current_signal = signals_df.iloc[-1]
+        current_signal = json.loads(current_signal.to_json())
 
-    current_signal = signals_df.iloc[-1]
-    current_signal = json.loads(current_signal.to_json())
+        # Get the latest signal
+        latest_signal = get_latest_signal(signals_df)
 
-    # Get the latest signal
-    latest_signal = get_latest_signal(signals_df)
+        # All Signals
+        all_signals = get_all_signals(signals_df)
 
-    # All Signals
-    all_signals = get_all_signals(signals_df)
-
-    return {
-        "status": HTTP_200_OK,
-        "message": "Signals",
-        "data": {
-            "ticker": ticker,
-            "period": period,
-            "interval": interval,
-            "strategy": strategy,
-            "signals": {
-                "latest_signal": latest_signal,
-                "all_signals": all_signals,
+        return {
+            "status": HTTP_200_OK,
+            "message": "Signals",
+            "data": {
+                "ticker": ticker,
+                "period": period,
+                "interval": interval,
+                "strategy": strategy,
+                "signals": {
+                    "latest_signal": latest_signal,
+                    "all_signals": all_signals,
+                },
             },
-        },
-    }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to get signals. Error: {e}")
+        
 
 
 def get_backtest_result(
@@ -135,7 +147,17 @@ def get_backtest_result(
         Exception: If there is an error fetching data from Yahoo Finance or calculating signals.
 
     """
-    logging.info("get_backtest_result started")
+    print(f"\n--- BACKTEST BEGINS --\n--- Start backtest for {ticker} ---\n")
+    print(f"Interval: {interval}")
+    print(f"Period: {period}")
+    print(f"Strategy: {strategy}")
+    print(f"Parameters: {json.dumps(parameters, indent=4)}")
+    if start:
+        print(f"Start Date: {start}")
+    if end:
+        print(f"End Date: {end}")
+        
+    
     df = None
     df1d = None
     try:
@@ -149,6 +171,7 @@ def get_backtest_result(
 
     parameters_dict = json.loads(parameters)
 
+    print(f"\n--- Calculating signals ---\n")
     signals_df = None
     try:
         signals_df = calculate_signals(df, df1d, strategy, parameters_dict)
@@ -176,7 +199,7 @@ def get_backtest_result(
         best_params,
     )
 
-    # Get the
+    print(f"\n--- Creating backtest result HTML ---\n")
     bt.plot(open_browser=False, filename="backtest.html")
     # Read the HTML content
     with open("backtest.html", "r") as file:
@@ -192,7 +215,8 @@ def get_backtest_result(
     # add the backtest_id
     for trade_action in trade_actions:
         trade_action["backtest_id"] = strategy_id
-
+        
+    print(f"\n--- Saving Trade Actions ---\n")
     try:
         latest_trade_action = None
         if strategy_id != None:
@@ -228,7 +252,7 @@ def get_backtest_result(
         )
 
     ### Saving data to the database ###
-
+    print ("\n--- Saving data to DB ---\n")
     # Save backtest stats to the database
     backtest_stats = {
         "ticker": ticker,
@@ -279,6 +303,11 @@ def get_backtest_result(
         backtest_stats["html"] = base64.b64encode(compressed_data).decode('utf-8')
     except Exception as e: 
         logging.error("Failed to deflate the HTML content", e)
+        
+    # Enable notification if sharpe_ratio is positive and return_percentage is positive
+    if backtest_stats["sharpe_ratio"] > 0 and backtest_stats["return_percentage"] > 0:
+        backtest_stats["notifications_on"] = True
+        notifications_on = True
     
     if strategy_id != None:
         backtest_stats["id"] = strategy_id
@@ -314,6 +343,7 @@ def get_backtest_result(
         logging.error(f"Failed to add backtest_id to trade_actions. Error: {e}")
 
     # Save trade actions to the database
+    print(f"\n--- Saving trade actions to DB ---\n")
     try:
         logging.info(f"Saving trade actions to the database. Ticker: {ticker}")
         print("--- Inserting Trade Actions to DB")
@@ -325,6 +355,7 @@ def get_backtest_result(
         logging.error(f"Failed to save trade actions to the database. Error: {e}")
 
     # Send notifications for new trade actions
+    print(f"\n--- Sending trade action notifications ---\n")
     if notifications_on & hasattr(trade_actions, 'data'):
         print("Sending trade action notification to LINE group...")
         print(trade_actions)
@@ -338,6 +369,8 @@ def get_backtest_result(
         except Exception as e:
             logging.error(f"Failed to send LINE notification. Error: {e}")
 
+    print(f"\n--- COMPLETE ---\n")
+    
     # Return the response. No longer need to send the HTML payload since it will be saved to DB.
     # Just return the id of those records
     return {
