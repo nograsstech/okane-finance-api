@@ -4,11 +4,11 @@ loguru
 aiohttp
 pandas
 python-dotenv
-fastapi==0.110.1
+fastapi[standard]==0.112.0
 requests
 pydantic==2.6.4
 uvicorn
-yfinance==0.2.17
+yfinance==0.2.51
 backtesting
 typing
 pandas_ta

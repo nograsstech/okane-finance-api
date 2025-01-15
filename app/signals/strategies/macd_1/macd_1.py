@@ -14,6 +14,8 @@ def macd_1(df, df1d, parameters):
   # EMA
   df["EMA_slow"]=ta.ema(df.Close, length=50)
   df["EMA_fast"]=ta.ema(df.Close, length=30)
+  # ATR
+  df["ATR"] = ta.atr(low = df.Low, close = df.Close, high = df.High, length=24)
   
   # create the column called Date. its value is the index without the time
   df['Date'] = df.index.date
@@ -22,6 +24,7 @@ def macd_1(df, df1d, parameters):
   # Ensure 'Date' in df and index in df1d are in the same datetime format
   df['Date'] = pd.to_datetime(df['Date'])
   df1d.index = pd.to_datetime(df1d.index)
+  
 
   # Use a try/except block to handle missing dates
   def get_macd(row):

@@ -15,10 +15,6 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     cash = 100000
     lot_size = size
 
-    import pandas_ta as ta
-
-    dftest["ATR"] = ta.atr(dftest.High, dftest.Low, dftest.Close, length=24)
-
     def SIGNAL():
         return dftest.TotalSignal
 
@@ -153,22 +149,27 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
         # Convert multiindex series to dataframe
         heatmap_df = heatmap.unstack()
         # find the one best parameters from heatmap_df
-        best_params = heatmap_df.idxmax()
+        optimized_params = heatmap_df.idxmax()
 
         # Find the maximum value over the entire DataFrame
         max_value = heatmap_df.max().max()
 
         # Find the index of the maximum value
-        best_params = (heatmap_df == max_value).stack().idxmax()
+        optimized_params = (heatmap_df == max_value).stack().idxmax()
+        
+        best_params = {}
+        best_params['tpslRatio'] = optimized_params[1]
+        best_params['slcoef'] = optimized_params[0]
 
         print(best_params)
+        
     else:
         print("Optimization is skipped and best params provided", best_params)
 
     strategy_parameters = {
         "best": True,
-        "tpslRatio": best_params[0],
-        "slcoef": best_params[1]
+        "tpslRatio": best_params['tpslRatio'],
+        "slcoef": best_params['slcoef']
     }
 
     print(strategy_parameters)
