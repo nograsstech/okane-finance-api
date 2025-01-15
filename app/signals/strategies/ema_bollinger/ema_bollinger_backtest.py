@@ -12,6 +12,8 @@ def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best
     margin = 1/500
     cash = 100000
     lot_size = size
+    
+    
 
     def SIGNAL():
         return dftest.TotalSignal
@@ -98,9 +100,9 @@ def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best
         bt = Backtest(dftest, MyStrat, cash=cash, margin=margin)
 
         stats, heatmap = bt.optimize(
-            slcoef=[i / 10 for i in range(10, 41, 2)],
-            TPSLRatio=[i / 10 for i in range(10, 31, 2)],
-            maximize="Sharpe Ratio",
+            slcoef=[i / 10 for i in range(10, 51, 2)],
+            TPSLRatio=[i / 10 for i in range(15, 25, 2)],
+            maximize="Win Rate [%]",
             max_tries=300,
             random_state=0,
             return_heatmap=True,
@@ -120,7 +122,7 @@ def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best
         print(best_params)
     else:
         print("Optimization is skipped and best params provided", best_params)
-
+        
     strategy_parameters = {
         "best": True,
         "tpslRatio": best_params[0],
@@ -130,7 +132,7 @@ def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best
     print(strategy_parameters)
     
     MyStrat.slcoef = strategy_parameters["slcoef"]
-    MyStrat.TPSLRatio = strategy_parameters["slcoef"]
+    MyStrat.TPSLRatio = strategy_parameters["tpslRatio"]
     
     bt_best = Backtest(dftest, MyStrat, cash=cash, margin=margin)
     stats = bt_best.run()

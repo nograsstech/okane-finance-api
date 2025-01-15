@@ -289,8 +289,9 @@ def get_backtest_result(
         "ref_id": backtest_process_uuid,
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
         "last_optimized_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
-        "tpsl_ratio": round(float(strategy_parameters["tpslRatio"]), 3),
-        "sl_coef": round(float(strategy_parameters["slcoef"]), 3),
+        "tpsl_ratio": round(float(strategy_parameters.get("tpslRatio", None)), 3) if strategy_parameters.get("tpslRatio") not in [None, ""] else None,
+        "sl_coef": round(float(strategy_parameters.get("slcoef", None)), 3) if strategy_parameters.get("slcoef") not in [None, ""] else None,
+        "tp_coef": round(float(strategy_parameters.get("TPcoef", None)), 3) if strategy_parameters.get("TPcoef") not in [None, ""] else None,
     }
     
     # Defalt the HTML content to save bandwidth and storage
@@ -308,6 +309,9 @@ def get_backtest_result(
     if backtest_stats["sharpe_ratio"] > 0 and backtest_stats["return_percentage"] > 0:
         backtest_stats["notifications_on"] = True
         notifications_on = True
+    else: 
+        backtest_stats["notifications_on"] = False
+        notifications_on = False
     
     if strategy_id != None:
         backtest_stats["id"] = strategy_id
@@ -428,7 +432,7 @@ def strategy_notification_job():
                 strategy_id=strategy["id"],
                 notifications_on=strategy["notifications_on"],
                 skip_optimization=time_difference < 3, # Reoptimize every 3 days
-                best_params=[strategy['tpsl_ratio'], strategy['sl_coef']],
+                best_params=[strategy['tpsl_ratio'], strategy['sl_coef'], strategy['tp_coef']],
             )
         except Exception as e:
             logging.error(f"Failed to send notification for strategy. Error: {e}")
