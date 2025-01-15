@@ -165,11 +165,20 @@ def get_backtest_result(
         if (strategy == "macd_1"):
             df1d = getYFinanceData(ticker, "1d", period, start, end)
     except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
         )
 
-    parameters_dict = json.loads(parameters)
+    try:
+        print("Parameters: ", parameters)
+        if (parameters) != None:
+            parameters_dict = json.loads(parameters)
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=400, detail=f"Failed to parse parameters. Error: {e}"
+        )
 
     print(f"\n--- Calculating signals ---\n")
     signals_df = None
@@ -432,7 +441,11 @@ def strategy_notification_job():
                 strategy_id=strategy["id"],
                 notifications_on=strategy["notifications_on"],
                 skip_optimization=time_difference < 3, # Reoptimize every 3 days
-                best_params=[strategy['tpsl_ratio'], strategy['sl_coef'], strategy['tp_coef']],
+                best_params={
+                    "tpslRatio": strategy['tpsl_ratio'],
+                    "slcoef": strategy['sl_coef'],
+                    "TPcoef": strategy['tp_coef']
+                },
             )
         except Exception as e:
             logging.error(f"Failed to send notification for strategy. Error: {e}")

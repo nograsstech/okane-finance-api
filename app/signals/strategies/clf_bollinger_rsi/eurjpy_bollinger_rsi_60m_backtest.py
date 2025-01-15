@@ -86,17 +86,21 @@ def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best
         max_value = heatmap_df.max().max()
 
         # Find the index of the maximum value
-        best_params = (heatmap_df == max_value).stack().idxmax()
-
+        optimized_params = (heatmap_df == max_value).stack().idxmax()
+        
+        best_params = {}
+        best_params['TPcoef'] = optimized_params[1]
+        best_params['slcoef'] = optimized_params[0]
+        
         print(best_params)
     else:
         print("Optimization is skipped and best params provided", best_params)
         
     strategy_parameters = {
         "best": True,
-        "TPcoef": best_params[0],
-        "slcoef": best_params[1],
-        "tpslRatio": best_params[0] / best_params[1]
+        "TPcoef": best_params['TPcoef'],
+        "slcoef": best_params['slcoef'],
+        "tpslRatio": best_params['TPcoef'] / best_params['slcoef']
     }
     
     print(strategy_parameters)
