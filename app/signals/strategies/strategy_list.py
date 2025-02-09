@@ -10,5 +10,8 @@ strategy_list = [
     "clf_bollinger_rsi",
     "clf_bollinger_rsi_15m",
     
-    "eurjpy_bollinger_rsi_60m"
+    "eurjpy_bollinger_rsi_60m",
+    
+    
+    "grid_trading"
 ]
