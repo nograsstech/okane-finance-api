@@ -172,7 +172,7 @@ def get_backtest_result(
 
     try:
         print("Parameters: ", parameters)
-        if (parameters) != None:
+        if parameters is not None:
             parameters_dict = json.loads(parameters)
     except Exception as e:
         print(e)
@@ -185,6 +185,7 @@ def get_backtest_result(
     try:
         signals_df = calculate_signals(df, df1d, strategy, parameters_dict)
     except Exception as e:
+        print("calculate_signals: ERROR: ", e)
         raise HTTPException(
             status_code=400, detail=f"Failed to calculate signals. Error: {e}"
         )
