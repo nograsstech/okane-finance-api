@@ -4,7 +4,7 @@ if mp.get_start_method(allow_none=True) != 'fork':
     mp.set_start_method('fork', force=True)
 import numpy as np
 
-def backtest(df, strategy_parameters=None, skip_optimization=False, best_params=None):
+def backtest(df, strategy_parameters=None, skip_optimization=False, best_params={ "grid_distance": 30 }):
     print("Starting grid trading backtest...")
     dftest = df[:]
 
@@ -71,10 +71,28 @@ def backtest(df, strategy_parameters=None, skip_optimization=False, best_params=
                 if open_buy_trade:
                     sl_buy = current_price - self.grid_distance * self.stop_loss_levels # SL for buy order
                     self.buy(tp=current_price + self.grid_distance, sl=sl_buy, size=self.mysize)  # Open buy at current level with SL (TP is full grid distance)
+                    self.trades_actions.append({
+                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                        "trade_action": "buy",
+                        "entry_price": self.data.Close[-1],
+                        "price": current_price,
+                        "sl": sl_buy,
+                        "tp": current_price + self.grid_distance,
+                        "size": self.mysize,
+                    })
                     print(f"New BUY trade opened at level: {current_price} with SL: {sl_buy}, TP: {current_price + self.grid_distance}")
                 if open_sell_trade:
                     sl_sell = current_price + self.grid_distance * self.stop_loss_levels # SL for sell order
                     self.sell(tp=current_price - self.grid_distance, sl=sl_sell, size=self.mysize) # Open sell at current level with SL (TP is full grid distance)
+                    self.trades_actions.append({
+                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                        "trade_action": "sell",
+                        "entry_price": self.data.Close[-1],
+                        "price": current_price,
+                        "sl": sl_sell,
+                        "tp": current_price - self.grid_distance,
+                        "size": self.mysize,
+                    })
                     print(f"New SELL trade opened at level: {current_price} with SL: {sl_sell}, TP: {current_price - self.grid_distance}")
 
 
@@ -86,8 +104,29 @@ def backtest(df, strategy_parameters=None, skip_optimization=False, best_params=
                     self.update_grid() # Update grid
                     sl_new_sell = self.current_grid_level + self.grid_distance * self.stop_loss_levels # SL for new sell
                     sl_new_buy = self.current_grid_level - self.grid_distance * self.stop_loss_levels # SL for new buy
+                    
                     self.sell(tp=self.current_grid_level - self.grid_distance, sl=sl_new_sell, size=self.mysize) # Open new sell at new grid level with SL (TP is full grid distance)
+                    self.trades_actions.append({
+                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                        "trade_action": "sell",
+                        "entry_price": self.data.Close[-1],
+                        "price": current_price,
+                        "sl": sl_new_sell,
+                        "tp": self.current_grid_level - self.grid_distance,
+                        "size": self.mysize,
+                    })
+                    
                     self.buy(tp=self.current_grid_level + self.grid_distance, sl=sl_new_buy, size=self.mysize)  # Open new buy at new grid level with SL (TP is full grid distance)
+                    self.trades_actions.append({
+                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                        "trade_action": "buy",
+                        "entry_price": self.data.Close[-1],
+                        "price": current_price,
+                        "sl": sl_new_buy,
+                        "tp": self.current_grid_level + self.grid_distance,
+                        "size": self.mysize,
+                    })
+                    
                     print(f"Long trade closed profitably at {trade.tp}. New grid level: {self.current_grid_level}. Opened new pair with SLs: Sell SL={sl_new_sell}, Buy SL={sl_new_buy}, TPs: Sell TP={self.current_grid_level - self.grid_distance}, Buy TP={self.current_grid_level + self.grid_distance}")
                     return # Exit after one profitable close and new pair open to avoid closing multiple in one candle
 
@@ -97,24 +136,67 @@ def backtest(df, strategy_parameters=None, skip_optimization=False, best_params=
                     self.update_grid() # Update grid
                     sl_new_sell = self.current_grid_level + self.grid_distance * self.stop_loss_levels # SL for new sell
                     sl_new_buy = self.current_grid_level - self.grid_distance * self.stop_loss_levels # SL for new buy
+                    
                     self.sell(tp=self.current_grid_level - self.grid_distance, sl=sl_new_sell, size=self.mysize) # Open new sell at new grid level with SL (TP is full grid distance)
+                    self.trades_actions.append({
+                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                        "trade_action": "sell",
+                        "entry_price": self.data.Close[-1], 
+                        "price": current_price,
+                        "sl": sl_new_sell,
+                        "tp": self.current_grid_level - self.grid_distance,
+                        "size": self.mysize,
+                    })
+                    
                     self.buy(tp=self.current_grid_level + self.grid_distance, sl=sl_new_buy, size=self.mysize)  # Open new buy at new grid level with SL (TP is full grid distance)
+                    self.trades_actions.append({
+                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                        "trade_action": "buy",
+                        "entry_price": self.data.Close[-1], 
+                        "price": current_price,
+                        "sl": sl_new_buy,
+                        "tp": self.current_grid_level + self.grid_distance,
+                        "size": self.mysize,
+                    })
                     print(f"Short trade closed profitably at {trade.tp}. New grid level: {self.current_grid_level}. Opened new pair with SLs: Sell SL={sl_new_sell}, Buy SL={sl_new_buy}, TPs: Sell TP={self.current_grid_level - self.grid_distance}, Buy TP={self.current_grid_level + self.grid_distance}")
                     return # Exit after one profitable close and new pair open
 
 
+    if (not skip_optimization): 
+        print("Optimizing...")
+        bt_best = Backtest(dftest, GridTradingStrategy, cash=cash, hedging=True, margin=margin, commission=commission)
+        stats = bt_best.run()
+        stats, heatmap = bt_best.optimize(
+                            grid_distance=[i for i in range(10, 50, 5)],
+                            grid_range=[1000],
+                            maximize='Max. Drawdown [%]', max_tries=500,
+                            random_state=0,
+                            return_heatmap=True)
+        # Convert multiindex series to dataframe
+        heatmap_df = heatmap.unstack()
+        # find the one best parameters from heatmap_df
+        best_params = heatmap_df.idxmax()
+
+        # Find the maximum value over the entire DataFrame
+        max_value = heatmap_df.max().max()
+
+       # Find the index of the maximum value
+        optimized_params = (heatmap_df == max_value).stack().idxmax()
+        
+        best_params = {}
+        best_params['grid_distance'] = optimized_params[0]
+
+        print(best_params)
+    else:
+        print("Optimization is skipped and best params provided", best_params)
+
     strategy_parameters = {
         "best": True,
-        "grid_distance": 30
+        "grid_distance": best_params['grid_distance']
     }
     print("Final strategy parameters:", strategy_parameters)
-
-
-    bt_best = Backtest(dftest, GridTradingStrategy, cash=cash, hedging=True, margin=margin, commission=commission)
-    stats = bt_best.run()
-
+    
     trades_actions = bt_best._strategy.trades_actions
-
     print(stats)
 
     return bt_best, stats, trades_actions, strategy_parameters

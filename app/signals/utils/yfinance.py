@@ -87,9 +87,6 @@ async def getYFinanceDataAsync(ticker, interval, period=None, start=None, end=No
   # use df index, convert DateTime to a column instead of index
   df.reset_index(inplace=True)
 
-  # delete Adj Close
-  df = df.drop(["Adj Close"], axis=1)
-
   # rename Datetime to "Gmt time"
   df = df.rename(columns={"Datetime": "Gmt time"})
 
