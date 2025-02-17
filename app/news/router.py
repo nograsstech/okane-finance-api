@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from app.news.dto import AlphaVantageNewsQueryDTO, AlphaVantageNewsResponseDTO
 from app.news import service
 from starlette.status import HTTP_200_OK
+from typing import Dict, List
 
 load_dotenv()
 
@@ -20,3 +21,10 @@ async def archive_ticker_news(params: AlphaVantageNewsQueryDTO = Depends()):
 @router.get("/6h", status_code=HTTP_200_OK)
 async def archive_ticker_news():
     return await service.fetch_alpha_vantage_news_6h()
+
+
+
+
+@router.get("/periodic-sentiment", response_model=Dict[str, float], status_code=HTTP_200_OK)
+async def get_news(ticker: str):
+    return await service.get_news_sentiment_per_period_by_ticker(ticker)
