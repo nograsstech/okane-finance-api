@@ -89,7 +89,7 @@ async def fetch_alpha_vantage_news(_params: AlphaVantageNewsQueryDTO):
 
 async def fetch_alpha_vantage_news_6h():
     # from is now - 6 hours, formatted as YYYYMMDDTHHmm
-    _date_utc = datetime.datetime.utcnow()
+    _date_utc = datetime.datetime.now(datetime.timezone.utc)
     _from_date = (_date_utc - datetime.timedelta(hours=6)
                   ).strftime("%Y%m%dT%H%M")
     _to_date = _date_utc.strftime("%Y%m%dT%H%M")
@@ -102,3 +102,42 @@ async def fetch_alpha_vantage_news_6h():
     }
     res = await fetch_alpha_vantage_news(_params)
     return res
+
+async def get_news_sentiment_per_period_by_ticker(ticker: str):
+    db = await connect_mongodb()
+    collection = db[COLLECTIONS["news_with_sentiment"]]
+
+    intervals = {
+        "6 hours": {"hours": 6},
+        "1 day": {"days": 1},
+        "1 week": {"days": 7},
+        "1 month": {"days": 30},
+        "3 months": {"days": 90},
+    }
+
+    results = {}
+
+    for interval_name, interval_delta in intervals.items():
+        _date_utc = datetime.datetime.utcnow()
+        from_date = (_date_utc - datetime.timedelta(**interval_delta)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        to_date = _date_utc.strftime("%Y%m%dT%H%M")
+
+        print(from_date)
+        news = collection.find({
+            "ticker_sentiment": {
+                "$elemMatch": {
+                    "ticker": ticker
+                }
+            },
+            "time_published": {
+                "$gte": from_date,
+            }
+        })
+        # Extract overall_sentiment_score from each document
+        sentiment_scores = [doc["overall_sentiment_score"] for doc in news]
+        
+        # Calculate the average sentiment score
+        average_sentiment_score = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+        
+        results[interval_name] = average_sentiment_score
+    return results
