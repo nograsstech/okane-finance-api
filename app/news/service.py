@@ -120,7 +120,6 @@ async def get_news_sentiment_per_period_by_ticker(ticker: str):
     for interval_name, interval_delta in intervals.items():
         _date_utc = datetime.datetime.utcnow()
         from_date = (_date_utc - datetime.timedelta(**interval_delta)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        to_date = _date_utc.strftime("%Y%m%dT%H%M")
 
         print(from_date)
         news = collection.find({
@@ -135,9 +134,34 @@ async def get_news_sentiment_per_period_by_ticker(ticker: str):
         })
         # Extract overall_sentiment_score from each document
         sentiment_scores = [doc["overall_sentiment_score"] for doc in news]
-        
         # Calculate the average sentiment score
         average_sentiment_score = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
         
-        results[interval_name] = average_sentiment_score
+        results[interval_name] = {"timeframe": average_sentiment_score}
+    
+    # Calculate weekly sentiment for the past 10 weeks
+    weekly_sentiments = {}
+    for i in range(1, 11):
+        week_name = f"{i} week{'s' if i > 1 else ''} ago"
+        _date_utc = datetime.datetime.utcnow()
+        from_date = (_date_utc - datetime.timedelta(days=i * 7)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        to_date = (_date_utc - datetime.timedelta(days=(i - 1) * 7)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        news = collection.find({
+            "ticker_sentiment": {
+                "$elemMatch": {
+                    "ticker": ticker
+                }
+            },
+            "time_published": {
+                "$gte": from_date,
+                "$lt": to_date,
+            }
+        })
+        
+        sentiment_scores = [doc["overall_sentiment_score"] for doc in news]
+        average_sentiment_score = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+        weekly_sentiments[week_name] = average_sentiment_score
+
+    results["weekly_sentiment"] = weekly_sentiments
     return results
