@@ -22,7 +22,7 @@ geminiExp1206 = ChatGoogleGenerativeAI(
 
 gemini2Flash = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash-001",
-    temperature=0.4,
+    temperature=0.6,
     max_tokens=None,
     timeout=None,
     max_retries=4,

@@ -1,13 +1,13 @@
 ## Set up a Python Virtual Environment
 
 ```zsh
-python3 -m venv venv
+python -m venv venv
 . venv/bin/activate
 ```
 
 ## Install the dependencies
 ```zsh
-pip3 install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Install FastAPI

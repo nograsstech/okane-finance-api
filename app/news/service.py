@@ -104,6 +104,20 @@ async def fetch_alpha_vantage_news_6h():
     return res
 
 async def get_news_sentiment_per_period_by_ticker(ticker: str):
+    """
+    Analyzes news sentiment for a given ticker over various time intervals and provides historical weekly sentiment.
+
+    Args:
+        ticker (str): The stock ticker symbol to analyze (e.g., "AAPL").
+
+    Returns:
+        Dict[str, Any]: A dictionary containing sentiment analysis results.
+            - For each time interval ("6 hours", "1 day", "1 week", "1 month", "3 months"),
+              the dictionary includes a "timeframe" key with the average sentiment score.
+              Example: {"6 hours": {"timeframe": 0.75}, "1 day": {"timeframe": 0.60}, ...}
+            - Includes a "weekly_sentiment" key containing the average sentiment score for each of the past 10 weeks.
+              Example: {"weekly_sentiment": {"1 week ago": 0.80, "2 weeks ago": 0.70, ...}}
+    """
     db = await connect_mongodb()
     collection = db[COLLECTIONS["news_with_sentiment"]]
 
