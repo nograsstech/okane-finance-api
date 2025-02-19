@@ -2,15 +2,14 @@ import json
 import asyncio
 from IPython.display import Image, display
 from typing_extensions import TypedDict, Annotated
-from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages import ToolMessage
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from app.ai.models.gemini import gemini2Flash
-from app.news.service import get_news_sentiment_per_period_by_ticker
-from langchain_core.tools import Tool
+from app.ai.tools.tavily_search import tavilySearchTool
+from app.ai.tools.news_sentiment import news_sentiment_tool
 
 # State
 
@@ -21,23 +20,6 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
-# Tools
-
-tavilySearchTool = TavilySearchResults(max_results=2)
-
-async def async_wrapper(**kwargs):
-    ticker = kwargs.get("ticker")
-    if not ticker:
-        raise ValueError("Missing required argument: 'ticker'")
-    print(1)
-    return await get_news_sentiment_per_period_by_ticker(ticker)
-
-news_sentiment_tool = Tool(
-    name="get_news_sentiment",
-    func=get_news_sentiment_per_period_by_ticker,  # Async function
-    coroutine=get_news_sentiment_per_period_by_ticker,  # Required for async tools
-    description="Fetches sentiment analysis for a given stock ticker over different time periods.",
-)
 
 
 tools = [tavilySearchTool, news_sentiment_tool]
