@@ -3,6 +3,7 @@ from pymongo.server_api import ServerApi
 import os
 from dotenv import load_dotenv
 import certifi
+from motor.motor_asyncio import AsyncIOMotorClient
 load_dotenv()
 
 COLLECTIONS = {
@@ -18,7 +19,7 @@ async def connect_mongodb():
 
   # Create a new client and connect to the server
   # client = MongoClient(uri, server_api=ServerApi('1'))
-  client = MongoClient(uri, server_api=ServerApi('1'), tlsCAFile=certifi.where())
+  client = AsyncIOMotorClient(uri, server_api=ServerApi('1'), tlsCAFile=certifi.where())
 
   # Send a ping to confirm a successful connection
   try:

@@ -28,12 +28,19 @@ async def get_chat():
 async def chatbot(request: MessageRequest):
     try:
         user_input = request.message
-        events = graph.stream(
+        print("A1")
+        events = await graph.ainvoke(
             {"messages": [("user", user_input)]}, config, stream_mode="values"
         )
-        all_events = list(events)  # Collect all events
+        print("A2")
+        # Properly await the async generator:
+        # all_events = [event async for event in events]
+        all_events = events
+        print("A3")
         for event in all_events:
-            event["messages"][-1].pretty_print()
+            print("A4")
+            if isinstance(event, dict) and "messages" in event:
+                event["messages"][-1].pretty_print()
         return {"okaneChatBot": all_events}  # Return all events
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
