@@ -20,7 +20,11 @@ Neutral Scores (around 0): Imply that the sentiment is neither positive nor nega
 Positive Scores (0 to 1): Indicate approval and optimism. A score of 0.7 would suggest a strong positive sentiment.
 
 
-Analyze this sentiment data of LMT using the provided data. Explain the trends clearly and concisely. Do not explain anything I didn't ask for. Make financial recommendations. Don't explain the financial risk as I have already understand them. 
+Analyze and compare this sentiment data of the ticker using the provided data over different sentiment periods.
+Explain the trends clearly and concisely.
+Do not explain anything I didn't ask for.
+Make financial recommendations.
+Don't explain the financial risk as I have already understand them. 
 
 < news_sentiment_tool  output here >
 

@@ -22,6 +22,10 @@ async def archive_ticker_news(params: AlphaVantageNewsQueryDTO = Depends()):
 async def archive_ticker_news():
     return await service.fetch_alpha_vantage_news_6h()
 
+@router.get("/yfinance", status_code=HTTP_200_OK)
+async def archive_ticker_news(ticker: str, limit: int = 10):
+    return await service.fetch_yfinance_news(ticker, limit)
+
 
 @router.get("/periodic-sentiment", response_model=Dict[str, Any], status_code=HTTP_200_OK)
 async def get_news(ticker: str):
