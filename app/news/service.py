@@ -106,13 +106,21 @@ async def fetch_alpha_vantage_news_6h():
 
 async def fetch_yfinance_news(ticker: str, limit: int = 10):
     try:
-        news = yf.Search(ticker, news_count=10).news
-        return news
+        news_result = yf.Search(ticker, news_count=limit).news
+        filtered_news = [
+            {key: value for key, value in news_item.items() if key not in ["thumbnail", "type", "uuid"]}
+            for news_item in news_result
+        ]
+        return {
+            "ticker": ticker,
+            "news": filtered_news,
+        }
     except Exception as e:
         return {
             "status": HTTP_400_BAD_REQUEST,
             "message": f"Failed to fetch news from yfinance. Error: {e}",
         }
+
 
 async def get_news_sentiment_per_period_by_ticker(ticker: str):
     db = await connect_mongodb()
@@ -173,5 +181,6 @@ async def get_news_sentiment_per_period_by_ticker(ticker: str):
         weekly_sentiments[week_name] = average_sentiment_score
 
     results["weekly_sentiment"] = weekly_sentiments
+    results["ticker"] = ticker
     print(results)
     return results

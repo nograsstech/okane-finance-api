@@ -19,16 +19,28 @@ Neutral Scores (around 0): Imply that the sentiment is neither positive nor nega
 
 Positive Scores (0 to 1): Indicate approval and optimism. A score of 0.7 would suggest a strong positive sentiment.
 
-
+[DO]
 Analyze and compare this sentiment data of the ticker using the provided data over different sentiment periods.
+Analyze the news as additional context.
 Explain the trends clearly and concisely.
-Do not explain anything I didn't ask for.
 Make financial recommendations.
-Don't explain the financial risk as I have already understand them. 
+Format and list the link to the news articles.
 
-< news_sentiment_tool  output here >
+[DO NOT]
+Do not explain anything I didn't ask for.
+Do not output just the raw data, but instead, summarize the key points from the sentiment and news
+Do not explain the financial risk as I have already understand them. 
 
-{json.dumps(sentiment_data)}
+
+<news>
+{json.dumps(sentiment_data.get("news"))}
+</news>
+
+<sentiment_data>
+{json.dumps(sentiment_data.get("sentiment_data"))}
+</sentiment_data>
+
+Use the news data to provide additional context for the sentiment analysis.
 """
     messages = [{"role": "user", "content": prompt}]
     result = await gemini2Flash.ainvoke(messages)

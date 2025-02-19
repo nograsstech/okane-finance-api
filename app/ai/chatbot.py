@@ -10,6 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from app.ai.models.gemini import gemini2Flash
 from app.ai.tools.tavily_search import tavilySearchTool
 from app.ai.tools.news_sentiment import news_sentiment_tool
+from app.ai.tools.get_yfinance_news import fetch_yfinance_news
 from app.ai.sentiment_analyzer import analyze_sentiment
 
 # State
@@ -24,7 +25,7 @@ class State(TypedDict):
 
 # Tools
 
-tools = [tavilySearchTool, news_sentiment_tool]
+tools = [tavilySearchTool, news_sentiment_tool, fetch_yfinance_news]
 
 class BasicToolNode:
     """A node that runs the tools requested in the last AIMessage."""
@@ -46,11 +47,9 @@ class BasicToolNode:
             tool_args = tool_call["args"]
 
             if asyncio.iscoroutinefunction(tool.func):
-                print(2)
                 task = tool.ainvoke(tool_args)  # Ensure async execution
                 tasks.append((task, tool_call))
             else:
-                print(3)
                 tool_result = tool.func(tool_args)  # Sync function
                 outputs.append(
                     ToolMessage(
@@ -76,16 +75,22 @@ class BasicToolNode:
 
 
 async def sentiment_analysis(state: State):
-    if messages := state.get("messages", []):
-        tool_message = messages[-1]
-    else:
-        raise ValueError("No message found in input")
+    messages = state.get("messages", [])
+    if len(messages) < 2:
+        return []
 
-    if tool_message.name == "get_news_sentiment":
-        sentiment_data = json.loads(tool_message.content)
-        analysis = await analyze_sentiment(sentiment_data)
-        return {"messages": [{"role": "assistant", "content": analysis}]}
-    return {"messages": []}
+    last_message = messages[-1]
+    second_last_message = messages[-2]
+    
+    print("last_message", last_message)
+    print("second_last_message", second_last_message)
+
+    if last_message.name == "fetch_yfinance_news" and second_last_message.name == "get_news_sentiment":
+        news = json.loads(last_message.content)
+        sentiment_data = json.loads(second_last_message.content)
+        analysis = await analyze_sentiment({"sentiment_data": sentiment_data, "news": news})
+        return { "messages": [{"role": "assistant", "content": analysis}]}
+    return { "messages": [] }
 
 
 def route_tools(
@@ -114,7 +119,6 @@ gemini2Flash_with_tools = gemini2Flash.bind_tools(tools)
 
 async def okaneChatBot(state: State):
     try:
-        print(5)
         result = await gemini2Flash_with_tools.ainvoke(state["messages"])  # Ensure async execution
         return {"messages": [result]}
     except Exception as e:
@@ -124,7 +128,7 @@ async def okaneChatBot(state: State):
 # Memory 
 
 memory = MemorySaver()
-config = {"configurable": {"thread_id": "1"}}
+config = {"configurable": {"thread_id": "2"}}
 
 # Graph
 
@@ -140,10 +144,9 @@ graph_builder.add_conditional_edges(
     route_tools,
     {"tools": "tools", END: END},
 )
-graph_builder.add_conditional_edges(
+graph_builder.add_edge(
     "tools",
-    lambda state: "sentiment_analysis" if state.get("messages", [])[-1].name == "get_news_sentiment" else END,
-    {"sentiment_analysis": "sentiment_analysis", END: END},
+    "sentiment_analysis",
 )
 graph_builder.add_edge("sentiment_analysis", END)
 graph = graph_builder.compile()
