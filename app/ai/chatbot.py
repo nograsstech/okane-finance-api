@@ -10,6 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from app.ai.models.gemini import gemini2Flash
 from app.ai.tools.tavily_search import tavilySearchTool
 from app.ai.tools.news_sentiment import news_sentiment_tool
+from app.ai.sentiment_analyzer import analyze_sentiment
 
 # State
 
@@ -21,9 +22,9 @@ class State(TypedDict):
 
 
 
+# Tools
 
 tools = [tavilySearchTool, news_sentiment_tool]
-tool_node = ToolNode(tools=tools)
 
 class BasicToolNode:
     """A node that runs the tools requested in the last AIMessage."""
@@ -74,6 +75,19 @@ class BasicToolNode:
         return {"messages": outputs}
 
 
+async def sentiment_analysis(state: State):
+    if messages := state.get("messages", []):
+        tool_message = messages[-1]
+    else:
+        raise ValueError("No message found in input")
+
+    if tool_message.name == "get_news_sentiment":
+        sentiment_data = json.loads(tool_message.content)
+        analysis = await analyze_sentiment(sentiment_data)
+        return {"messages": [{"role": "assistant", "content": analysis}]}
+    return {"messages": []}
+
+
 def route_tools(
     state: State,
 ):
@@ -90,9 +104,6 @@ def route_tools(
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
         return "tools"
     return END
-
-
-tool_node = BasicToolNode(tools=tools)
 
 
 # LLM
@@ -117,21 +128,24 @@ config = {"configurable": {"thread_id": "1"}}
 
 # Graph
 
+tool_node = BasicToolNode(tools=tools)
+
 graph_builder = StateGraph(State)
 graph_builder.add_edge(START, "okaneChatBot")
 graph_builder.add_node("okaneChatBot", okaneChatBot)
+graph_builder.add_node("tools", tool_node)
+graph_builder.add_node("sentiment_analysis", sentiment_analysis)
 graph_builder.add_conditional_edges(
     "okaneChatBot",
     route_tools,
-    # The following dictionary lets you tell the graph to interpret the condition's outputs as a specific node
-    # It defaults to the identity function, but if you
-    # want to use a node named something else apart from "tools",
-    # You can update the value of the dictionary to something else
-    # e.g., "tools": "my_tools"
     {"tools": "tools", END: END},
 )
-graph_builder.add_node("tools", tool_node)
-graph_builder.add_edge("okaneChatBot", END)
+graph_builder.add_conditional_edges(
+    "tools",
+    lambda state: "sentiment_analysis" if state.get("messages", [])[-1].name == "get_news_sentiment" else END,
+    {"sentiment_analysis": "sentiment_analysis", END: END},
+)
+graph_builder.add_edge("sentiment_analysis", END)
 graph = graph_builder.compile()
 
 def get_langgraph_graph():
