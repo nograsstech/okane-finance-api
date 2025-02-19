@@ -4,6 +4,7 @@ from fastapi.responses import Response
 from app.ai.chatbot import graph, config, get_langgraph_graph
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from app.ai.service import get_chatbot_response
 
 class MessageRequest(BaseModel):
     message: str
@@ -26,18 +27,8 @@ async def get_chat():
 
 @router.post("/chatbot-with-tool")
 async def chatbot(request: MessageRequest):
-    # try:
+    try:
         user_input = request.message
-        events = await graph.ainvoke(
-            {"messages": [("user", user_input)]}, config, stream_mode="values"
-        )
-        # Properly await the async generator:
-        # all_events = [event async for event in events]
-        all_events = events
-        print("HERE BABY")
-        for event in all_events:
-            if isinstance(event, dict) and "messages" in event:
-                event["messages"][-1].pretty_print()
-        return {"okaneChatBot": all_events}  # Return all events
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=str(e))
+        return await get_chatbot_response(user_input)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
