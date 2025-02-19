@@ -24,13 +24,13 @@ Analyze and compare this sentiment data of the ticker using the provided data ov
 Analyze the news as additional context.
 Explain the trends clearly and concisely.
 Make financial recommendations.
-Format and list the link to the news articles.
+Format and list the link to the news articles. Optimize for Discord.
 
 [DO NOT]
 Do not explain anything I didn't ask for.
 Do not output just the raw data, but instead, summarize the key points from the sentiment and news
 Do not explain the financial risk as I have already understand them. 
-
+Do not generate more than 1900 characters.
 
 <news>
 {json.dumps(sentiment_data.get("news"))}
