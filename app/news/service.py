@@ -5,6 +5,7 @@ import requests
 from app.base.utils.mongodb import connect_mongodb, COLLECTIONS
 from app.news.dto import AlphaVantageNewsQueryDTO
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
+import yfinance as yf
 
 """
 Mock response for AlphaVantage News and Sentiment API for testing purposes
@@ -102,6 +103,16 @@ async def fetch_alpha_vantage_news_6h():
     }
     res = await fetch_alpha_vantage_news(_params)
     return res
+
+async def fetch_yfinance_news(ticker: str, limit: int = 10):
+    try:
+        news = yf.Search(ticker, news_count=10).news
+        return news
+    except Exception as e:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": f"Failed to fetch news from yfinance. Error: {e}",
+        }
 
 async def get_news_sentiment_per_period_by_ticker(ticker: str):
     db = await connect_mongodb()
