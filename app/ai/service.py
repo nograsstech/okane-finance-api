@@ -4,10 +4,12 @@ from langchain_core.messages import ToolMessage
 from typing_extensions import TypedDict, Annotated
 from app.ai.chatbot import graph, config, get_langgraph_graph
 
-async def get_chatbot_response(user_input: str):
+async def get_chatbot_response(user_input: str, username: str = "User"):
   print("user_input is: ", user_input)
   events = await graph.ainvoke(
-      {"messages": [("user", user_input)]}, config, stream_mode="values"
+      {"messages": [("user", user_input)]},
+      config={"configurable": {"thread_id": username }},
+      stream_mode="values"
   )
   # Properly await the async generator:
   # all_events = [event async for event in events]

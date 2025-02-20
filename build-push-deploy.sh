@@ -12,3 +12,4 @@ gcloud run services add-iam-policy-binding okane-finance-api \
 gcloud run services update okane-finance-api \
 --image asia-east1-docker.pkg.dev/quantitative-trading-point/moni/okane-finance-api:latest \
 --region asia-east1 
+  
