@@ -20,7 +20,7 @@ router = APIRouter(
 
 @router.get("/discord-webhook")
 async def test_discord_webhook(request: Request):
-    return {"status": "Hello World"}
+    return {"status": "Discord Webhook Online"}
 
 @router.post("/discord-webhook")
 async def receive_discord_message(request: Request):
@@ -29,6 +29,7 @@ async def receive_discord_message(request: Request):
     # Extract username and message content
     username = data.get("user", "")
     message_content = data.get("message", "")
+    message_id = data.get("message_id", "")
     
     if (username == "Okane Agents"):
         return {"status": "Message processed"}
@@ -40,7 +41,13 @@ async def receive_discord_message(request: Request):
 
     # Send response back to Discord
     payload = {"content": str(chatbot_message)}
+    
+    if (message_id is not ""): 
+        payload["message_reference"] = {
+            "message_id":str( message_id)
+        }
 
+    print( payload )
     print("Sending Discord notification...", chatbot_message)
     url = os.environ.get("DISCORD_OKANE_AGENTS_CHANNEL_WEBHOOK_URL")
     headers = {
