@@ -18,6 +18,6 @@ pip install "fastapi[standard]"
 
 ## Running the application
 ```zsh
-fastapi dev --host 127.0.0.1 --port 8001 main.py
+fastapi dev --host 127.0.0.1 --port 8000 app/main.py
 ```
 

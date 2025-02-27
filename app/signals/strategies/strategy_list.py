@@ -13,5 +13,6 @@ strategy_list = [
     "eurjpy_bollinger_rsi_60m",
     
     
-    "grid_trading"
+    "grid_trading",
+    "super_safe_strategy"
 ]

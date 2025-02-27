@@ -5,6 +5,7 @@ from .ema_bollinger.ema_bollinger import ema_bollinger_signals
 from .ema_bollinger_1_low_risk.ema_bollinger_1_low_risk import ema_bollinger_signals as ema_bollinger_signals_low_risk
 from .macd_1.macd_1 import macd_1
 from .grid_trading.grid_trading import grid_trading
+from .super_safe_strategy.super_safe_strategy import super_safe_strategy_signals
 
 def calculate_signals(df, df1d, strategy, parameters):
     print(strategy, parameters)
@@ -23,6 +24,8 @@ def calculate_signals(df, df1d, strategy, parameters):
         return eurjpy_bollinger_rsi_60m(df, parameters)
       elif strategy == "grid_trading":
         return grid_trading(df, parameters)
+      elif strategy == "super_safe_strategy":
+        return super_safe_strategy_signals(df, parameters)
       else:
           return None
     except Exception as e:
@@ -47,6 +50,7 @@ async def calculate_signals_async(df, df1d, strategy, parameters):
       return eurjpy_bollinger_rsi_60m(df, parameters)
   elif strategy == "grid_trading":
       return grid_trading(df, parameters)
+  elif strategy == "super_safe_strategy":
+      return super_safe_strategy_signals(df, parameters)
   else:
       return None
-    
