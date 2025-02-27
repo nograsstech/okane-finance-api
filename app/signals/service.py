@@ -316,7 +316,10 @@ def get_backtest_result(
         logging.error("Failed to deflate the HTML content", e)
         
     # Enable notification if sharpe_ratio is positive and return_percentage is positive
-    if backtest_stats["sharpe_ratio"] > 0 and backtest_stats["return_percentage"] > 0:
+    if (
+        (backtest_stats["sharpe_ratio"] > 0 and backtest_stats["return_percentage"] > 0) or
+        (backtest_stats["win_rate"] > 60)
+    ):
         backtest_stats["notifications_on"] = True
         notifications_on = True
     else: 
