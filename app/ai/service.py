@@ -1,14 +1,12 @@
-import json
-import asyncio
 from langchain_core.messages import ToolMessage
-from typing_extensions import TypedDict, Annotated
-from app.ai.chatbot import graph, config, get_langgraph_graph
+from app.ai.chatbot import graph, get_langgraph_graph
 
-async def get_chatbot_response(user_input: str, username: str = "User"):
+async def get_chatbot_response(user_input: str, thread_id: str = "User"):
   print("user_input is: ", user_input)
+  print("Calling with thread_id: ", thread_id)
   events = await graph.ainvoke(
       {"messages": [("user", user_input)]},
-      config={"configurable": {"thread_id": username }},
+      config={"configurable": {"thread_id": thread_id }},
       stream_mode="values"
   )
   # Properly await the async generator:

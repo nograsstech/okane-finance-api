@@ -1,13 +1,14 @@
 from io import BytesIO
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
-from app.ai.chatbot import graph, config, get_langgraph_graph
+from app.ai.chatbot import get_langgraph_graph
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.ai.service import get_chatbot_response
 
 class MessageRequest(BaseModel):
     message: str
+    thread_id: str
 
 router = APIRouter(
   prefix="/ai",
@@ -29,6 +30,7 @@ async def get_chat():
 async def chatbot(request: MessageRequest):
     try:
         user_input = request.message
-        return await get_chatbot_response(user_input)
+        thread_id = request.thread_id
+        return await get_chatbot_response(user_input=user_input, thread_id=thread_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
