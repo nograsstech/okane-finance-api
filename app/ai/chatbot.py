@@ -4,7 +4,7 @@ import uuid
 from IPython.display import Image, display
 from typing_extensions import TypedDict, Annotated
 
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, HumanMessage, AIMessage
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -17,7 +17,6 @@ from app.ai.models.gemini import gemini2Flash, financial_advisor_chain
 from app.ai.tools.news_sentiment import news_sentiment_tool
 from app.ai.tools.get_yfinance_news import fetch_yfinance_news
 from app.ai.sentiment_analyzer import analyze_sentiment
-from app.ai.tools.duckduckgo_search import duckduckgo_search_tool
 
 # Import and instantiate DuckDuckGoSearchRun
 from langchain_community.tools import DuckDuckGoSearchRun
@@ -58,7 +57,7 @@ class BasicToolNode:
 
             # Use the asynchronous method if available
             if hasattr(tool, "arun") and asyncio.iscoroutinefunction(tool.arun):
-                task = tool.arun(tool_args)  # call the async method
+                task = tool.arun(tool_args)
                 tasks.append((task, tool_call))
             # Fallback to the synchronous method if available
             elif hasattr(tool, "run"):
@@ -87,6 +86,35 @@ class BasicToolNode:
         return {"messages": outputs}
 
 # ---------------------------
+# Grounding Agent
+# ---------------------------
+async def search_grounding_agent(state: State):
+    """
+    This node grounds the final answer by performing a DuckDuckGo search
+    using the original user query (assumed to be the first message).
+    """
+    if not state.get("messages"):
+        raise ValueError("No messages found in state for grounding.")
+
+    # Use the original user query (first message) as the search query.
+    # We assume the first message is a HumanMessage with a 'content' attribute.
+    user_query = state["messages"][0].content if hasattr(state["messages"][0], "content") else ""
+    search_args = {"query": user_query}
+
+    # Run the search tool asynchronously.
+    results = await duckduckgo_search_tool.arun(search_args)
+    
+    # Format the top 3 results (adjust formatting as needed)
+    if isinstance(results, list):
+        formatted_results = "\n".join(results[:3])
+    else:
+        formatted_results = str(results)
+        
+    grounding_message = AIMessage(content=f"Grounded search results:\n{formatted_results}")
+    state["messages"].append(grounding_message)
+    return state
+
+# ---------------------------
 # Sentiment Analysis Agent
 # ---------------------------
 async def sentiment_analysis_agent(state: State):
@@ -96,22 +124,26 @@ async def sentiment_analysis_agent(state: State):
 
     sentiment_data = None
     yfinance_news = None
+    search_results = None
 
-    # Search for tool response messages by their tool names
+    # Search for tool response messages by their tool names.
     for message in messages:
         if hasattr(message, "name"):
             if message.name == "get_news_sentiment":
                 sentiment_data = json.loads(message.content)
             elif message.name == "fetch_yfinance_news":
                 yfinance_news = json.loads(message.content)
+            elif message.name == "DuckDuckGoSearchRun":
+                search_results = json.loads(message.content)
 
-    # If both tool responses are available, run the sentiment analyzer
+    # If both tool responses are available, run the sentiment analyzer.
     if sentiment_data and yfinance_news:
         analysis = await analyze_sentiment({
             "sentiment_data": sentiment_data,
-            "news": yfinance_news
+            "news": yfinance_news,
+            "search_results": search_results
         })
-        return {"messages": [{"role": "assistant", "content": analysis}]}
+        return {"messages": [AIMessage(content=analysis)]}
 
     return {"messages": []}
 
@@ -120,25 +152,23 @@ async def sentiment_analysis_agent(state: State):
 # ---------------------------
 def route_tools(state: State):
     """
-    Route to the "tools" node if the last message contains tool calls,
-    otherwise, proceed to END.
+    If the last AI message contains tool calls, route to the "tools" node;
+    otherwise, continue to the grounding step.
     """
-    if isinstance(state, list):
-        ai_message = state[-1]
-    elif messages := state.get("messages", []):
-        ai_message = messages[-1]
-    else:
+    messages = state.get("messages", [])
+    if not messages:
         raise ValueError(f"No messages found in input state: {state}")
+    ai_message = messages[-1]
 
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
         return "tools"
     else:
-        return END
+        return "grounding_agent"
 
 # ---------------------------
 # LLM Agent Binding
 # ---------------------------
-# Bind the tools (including our DuckDuckGo search tool) to the LLM model
+# Bind the tools (including our DuckDuckGo search tool) to the LLM model.
 gemini2Flash_with_tools = gemini2Flash.bind_tools(tools)
 
 # ---------------------------
@@ -147,7 +177,8 @@ gemini2Flash_with_tools = gemini2Flash.bind_tools(tools)
 async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseStore):
     thread_id = config["configurable"]["thread_id"]
     namespace = ("memories", thread_id)
-    memories = store.search(namespace, query=str(state["messages"][-1].content))
+    # Use attribute access for the message content
+    memories = store.search(namespace, query=state["messages"][-1].content)
     info = "\n".join([d.value["data"] for d in memories])
     system_msg = (
         "You are a financial advisor. Please provide helpful and informative responses "
@@ -158,16 +189,17 @@ async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseS
 
     last_message = state["messages"][-1]
     if "remember" in last_message.content.lower():
-        memory = last_message.content
-        store.put(namespace, str(uuid.uuid4()), {"data": memory})
+        store.put(namespace, str(uuid.uuid4()), {"data": last_message.content})
 
     messages = state.get("messages", [])
     if not messages:
         raise ValueError("No message found in input")
 
     try:
+        # Combine the system message with existing messages.
+        # Adjust the format if needed for your LLM.
         result = await gemini2Flash_with_tools.ainvoke(
-            [{"role": "system", "content": system_msg}] + state["messages"]
+            [{"role": "system", "content": system_msg}] + messages
         )
         return {"messages": [result]}
     except Exception as e:
@@ -190,31 +222,34 @@ in_memory_store = InMemoryStore(
 # ---------------------------
 # Graph Construction
 # ---------------------------
-# Create the tool node using our list of tool instances
+# Create the tool node using our list of tool instances.
 tool_node = BasicToolNode(tools=tools)
 
-# Build the state graph
 graph_builder = StateGraph(State)
 graph_builder.add_edge(START, "okane_chat_agent")
 graph_builder.add_node("okane_chat_agent", okane_chat_agent)
 graph_builder.add_node("tools", tool_node)
+graph_builder.add_node("grounding_agent", search_grounding_agent)
 graph_builder.add_node("sentiment_analysis_agent", sentiment_analysis_agent)
 
-# Conditional routing: if the last AI message has tool calls, go to "tools"
+# Conditional routing: if tool calls exist, run the "tools" node; otherwise, jump to grounding.
 graph_builder.add_conditional_edges(
     "okane_chat_agent",
     route_tools,
-    {"tools": "tools", END: END},
+    {"tools": "tools", "grounding_agent": "grounding_agent"},
 )
-graph_builder.add_edge("tools", "sentiment_analysis_agent")
+# If the "tools" node was executed, continue to grounding.
+graph_builder.add_edge("tools", "grounding_agent")
+# After grounding, run sentiment analysis (if applicable) before ending.
+graph_builder.add_edge("grounding_agent", "sentiment_analysis_agent")
 graph_builder.add_edge("sentiment_analysis_agent", END)
 
-# Compile the graph with checkpointing and persistent store
+# Compile the graph with checkpointing and persistent store.
 graph = graph_builder.compile(checkpointer=memory, store=in_memory_store)
 
 def get_langgraph_graph():
     try:
         return graph.get_graph().draw_mermaid_png()
     except Exception:
-        # Optional: this requires extra dependencies to render the diagram
+        # Optional: rendering the diagram requires extra dependencies.
         return None

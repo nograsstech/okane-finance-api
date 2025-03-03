@@ -40,20 +40,34 @@ async def receive_discord_message(request: Request):
     
 
     # Send response back to Discord
-    payload = {"content": str(chatbot_message)}
-    
-    if (message_id is not ""): 
-        payload["message_reference"] = {
-            "message_id":str( message_id)
-        }
-
-    print( payload )
-    print("Sending Discord notification...", chatbot_message)
     url = os.environ.get("DISCORD_OKANE_AGENTS_CHANNEL_WEBHOOK_URL")
     headers = {
         "Content-Type": "application/json",
     }
-    data = {"content": chatbot_message}
-    requests.post(url, headers=headers, data=json.dumps(payload))
-    print(f"Discord notification sent successfully.")
+
+    if len(chatbot_message) > 2000:
+        chunks = [chatbot_message[i:i+1900] for i in range(0, len(chatbot_message), 1900)]
+        for chunk in chunks:
+            payload = {"content": str(chunk)}
+            if (message_id is not ""): 
+                payload["message_reference"] = {
+                    "message_id":str( message_id)
+                }
+            print( payload )
+            print("Sending Discord notification...", chunk)
+            data = {"content": chunk}
+            requests.post(url, headers=headers, data=json.dumps(payload))
+            print(f"Discord notification sent successfully.")
+    else:
+        payload = {"content": str(chatbot_message)}
+        if (message_id is not ""): 
+            payload["message_reference"] = {
+                "message_id":str( message_id)
+            }
+
+        print( payload )
+        print("Sending Discord notification...", chatbot_message)
+        data = {"content": chatbot_message}
+        requests.post(url, headers=headers, data=json.dumps(payload))
+        print(f"Discord notification sent successfully.")
     return {"status": "Message processed"}

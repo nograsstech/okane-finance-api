@@ -1,4 +1,4 @@
-from app.ai.models.gemini import gemini2FlashDiscordResponder
+from app.ai.models.gemini import gemini2Flash
 import json
 
 async def analyze_sentiment(sentiment_data):
@@ -27,6 +27,7 @@ async def analyze_sentiment(sentiment_data):
             Make financial recommendations.
             Format and list the link to the news articles. Optimize for Discord.
             Separete the sentiment analysis and news analysis into separate sections.
+            Cite the source name very briefly for search results.
 
             [DO NOT]
             Do not explain anything I didn't ask for.
@@ -41,9 +42,13 @@ async def analyze_sentiment(sentiment_data):
             <sentiment_data>
             {json.dumps(sentiment_data.get("sentiment_data"))}
             </sentiment_data>
+            
+            <search_results>
+            {json.dumps(sentiment_data.get("search_results"))}
+            </search_results>
 
             Use the news data to provide additional context for the sentiment analysis.
             """
     messages = [{"role": "user", "content": prompt}]
-    result = await gemini2FlashDiscordResponder.ainvoke(messages)
+    result = await gemini2Flash.ainvoke(messages)
     return result.content
