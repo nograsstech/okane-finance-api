@@ -54,11 +54,17 @@ class BasicToolNode:
         for tool_call in message.tool_calls:
             tool = self.tools_by_name[tool_call["name"]]
             tool_args = tool_call["args"]
+            
+            # Ensure tool_call_id is present and properly set
+            tool_call_id = tool_call.get("id")
+            if not tool_call_id:
+                # Generate a UUID if id not present
+                tool_call_id = str(uuid.uuid4())
 
             # Use the asynchronous method if available
             if hasattr(tool, "arun") and asyncio.iscoroutinefunction(tool.arun):
-                task = tool.arun(tool_args)
-                tasks.append((task, tool_call))
+                task = tool.arun(tool_args)  # call the async method
+                tasks.append((task, tool_call, tool_call_id))
             # Fallback to the synchronous method if available
             elif hasattr(tool, "run"):
                 tool_result = tool.run(tool_args)
@@ -66,25 +72,35 @@ class BasicToolNode:
                     ToolMessage(
                         content=json.dumps(tool_result),
                         name=tool_call["name"],
-                        tool_call_id=tool_call["id"],
+                        tool_call_id=tool_call_id,
                     )
                 )
             else:
                 raise ValueError(f"Tool {tool_call['name']} does not have 'run' or 'arun' method.")
 
+        print(f"tool_call in sync: {tool_call}")
+        print(f"tool_call.keys() in sync: {tool_call.keys()}")
+        print(f"tool_call.get('id') in sync: {tool_call.get('id')}")
+        print(f"tool_call.get('name') in sync: {tool_call.get('name')}")
+        print(f"tool_call.get('args') in sync: {tool_call.get('args')}")
+
         # Await all asynchronous tasks and process results
-        for task, tool_call in tasks:
+        for task, tool_call, tool_call_id in tasks:
+            print(f"tool_call in async: {tool_call}")
+            print(f"tool_call.keys() in async: {tool_call.keys()}")
+            print(f"tool_call.get('id') in async: {tool_call.get('id')}")
+            print(f"tool_call.get('name') in async: {tool_call.get('name')}")
+            print(f"tool_call.get('args') in async: {tool_call.get('args')}")
             tool_result = await task
             outputs.append(
                 ToolMessage(
                     content=json.dumps(tool_result),
                     name=tool_call["name"],
-                    tool_call_id=tool_call["id"],
+                    tool_call_id=tool_call_id,
                 )
             )
 
         return {"messages": outputs}
-
 # ---------------------------
 # Grounding Agent
 # ---------------------------
@@ -104,14 +120,16 @@ async def search_grounding_agent(state: State):
     # Run the search tool asynchronously.
     results = await duckduckgo_search_tool.arun(search_args)
     
+    print("Search results: ", results)
+    
     # Format the top 3 results (adjust formatting as needed)
     if isinstance(results, list):
         formatted_results = "\n".join(results[:3])
     else:
         formatted_results = str(results)
         
-    grounding_message = AIMessage(content=f"Grounded search results:\n{formatted_results}")
-    state["messages"].append(grounding_message)
+    # grounding_message = AIMessage(content=f"Grounded search results:\n{formatted_results}")
+    # state["messages"].append(grounding_message)
     return state
 
 # ---------------------------
@@ -179,30 +197,76 @@ async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseS
     namespace = ("memories", thread_id)
     # Use attribute access for the message content
     memories = store.search(namespace, query=state["messages"][-1].content)
-    info = "\n".join([d.value["data"] for d in memories])
+    info = "\\n".join([d.value["data"] for d in memories])
+    
+    # Extract grounded search results from the state
+    grounding_message = ""
+    for msg in state["messages"]:
+        if isinstance(msg, AIMessage) and "Grounded search results" in msg.content:
+            grounding_message = msg.content
+            break
+            
     system_msg = (
         "You are a financial advisor. Please provide helpful and informative responses "
         "to the user's questions about finance. You have access to the following tools: "
         "DuckDuckGoSearchRun, news_sentiment_tool, fetch_yfinance_news. Here's some context: "
-        f"{info}"
+        f"{info}\\n{grounding_message}" # Incorporate grounding results
     )
 
     last_message = state["messages"][-1]
+    store.put(namespace, str(uuid.uuid4()), {"data": last_message.content})
     if "remember" in last_message.content.lower():
-        store.put(namespace, str(uuid.uuid4()), {"data": last_message.content})
+        pass # previously stored the message here, now storing all messages
 
     messages = state.get("messages", [])
     if not messages:
         raise ValueError("No message found in input")
 
     try:
-        # Combine the system message with existing messages.
-        # Adjust the format if needed for your LLM.
-        result = await gemini2Flash_with_tools.ainvoke(
-            [{"role": "system", "content": system_msg}] + messages
-        )
+        # Ensure we don't send empty messages to the Gemini model
+        formatted_messages = [{"role": "system", "content": system_msg}]
+        
+        for msg in messages:
+            # Skip any message with empty content
+            if not hasattr(msg, 'content') or not msg.content:
+                continue
+                
+            # Determine the role based on message type
+            if isinstance(msg, HumanMessage):
+                role = "user"
+            elif isinstance(msg, AIMessage):
+                role = "assistant"
+            elif isinstance(msg, ToolMessage):
+                role = "tool"
+                # For ToolMessages, we need to ensure we properly format them
+                tool_message = {
+                    "role": role, 
+                    "content": msg.content,
+                    "name": getattr(msg, "name", "unknown_tool")
+                }
+                
+                # Only include tool_call_id if it exists to avoid KeyError
+                if hasattr(msg, "tool_call_id") and msg.tool_call_id is not None:
+                    tool_message["tool_call_id"] = msg.tool_call_id
+                
+                formatted_messages.append(tool_message)
+                continue  # Skip the default append below
+            else:
+                role = "user"  # Default fallback
+                
+            formatted_messages.append({"role": role, "content": msg.content})
+        
+        # Ensure we have at least one non-system message
+        if len(formatted_messages) <= 1:
+            # Add a fallback message if we somehow ended up with only the system message
+            formatted_messages.append({"role": "user", "content": "Tell me about financial advice."})
+            
+        result = await gemini2Flash_with_tools.ainvoke(formatted_messages)
+        store.put(namespace, str(uuid.uuid4()), {"data": result.content}) # Store the response
         return {"messages": [result]}
     except Exception as e:
+        print(f"Error details in okane_chat_agent: {type(e)}, {str(e)}")
+        # Add more detailed error handling/logging here
         raise ValueError(f"Error in okane_chat_agent: {e}")
 
 # ---------------------------
@@ -236,11 +300,9 @@ graph_builder.add_node("sentiment_analysis_agent", sentiment_analysis_agent)
 graph_builder.add_conditional_edges(
     "okane_chat_agent",
     route_tools,
-    {"tools": "tools", "grounding_agent": "grounding_agent"},
+    {"tools": "tools", "grounding_agent": "grounding_agent"}
 )
-# If the "tools" node was executed, continue to grounding.
 graph_builder.add_edge("tools", "grounding_agent")
-# After grounding, run sentiment analysis (if applicable) before ending.
 graph_builder.add_edge("grounding_agent", "sentiment_analysis_agent")
 graph_builder.add_edge("sentiment_analysis_agent", END)
 

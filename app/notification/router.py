@@ -9,7 +9,7 @@ import logging
 # Load environment variables from .env file
 from dotenv import load_dotenv, find_dotenv
 
-from app.ai.service import get_chatbot_response
+from app.ai.service import get_chatbot_response_async
 load_dotenv(find_dotenv(), override=True)
 
 router = APIRouter(
@@ -34,7 +34,7 @@ async def receive_discord_message(request: Request):
     if (username == "Okane Agents"):
         return {"status": "Message processed"}
 
-    chatbot_message_raw = await get_chatbot_response(message_content, username)
+    chatbot_message_raw = await get_chatbot_response_async(message_content, username)
     print("chatbot_message", chatbot_message_raw)
     chatbot_message = chatbot_message_raw["okaneChatBot"]["messages"][-1].content
     
