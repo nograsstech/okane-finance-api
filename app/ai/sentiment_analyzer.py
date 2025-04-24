@@ -20,13 +20,14 @@ async def analyze_sentiment(sentiment_data):
             Positive Scores (0 to 1): Indicate approval and optimism. A score of 0.7 would suggest a strong positive sentiment.
 
             [DO]
-            Analyze and compare this sentiment data of the ticker using the provided data over different sentiment periods.
+            Analyze and compare this sentiment data of the ticker using the provided data over different sentiment periods. Analyze the trend.
             Be detailed about each period and list them out clearly in bullet points.
             Analyze the news as additional context.
             Explain the trends clearly and concisely.
             Make financial recommendations.
-            Format and list the link to the news articles. Optimize for Discord.
             Separete the sentiment analysis and news analysis into separate sections.
+            Clearly state whether to BUY, SELL, or HOLD the asset.
+            Format and list the link to the news articles.
             Cite the source name very briefly for search results.
 
             [DO NOT]
@@ -34,6 +35,7 @@ async def analyze_sentiment(sentiment_data):
             Do not output just the raw data, but instead, summarize the key points from the sentiment and news
             Do not explain the financial risk as I have already understand them. 
             Do not generate more than 1900 characters.
+            Do not wrap the response in "```"
 
             <news>
             {json.dumps(sentiment_data.get("news"))}
