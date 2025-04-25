@@ -316,7 +316,6 @@ def get_backtest_result(
         logging.error("Failed to deflate the HTML content", e)
         
     # Enable notification if sharpe_ratio is positive and return_percentage is positive
-<<<<<<< Updated upstream
     if (
         (backtest_stats["sharpe_ratio"] > 0 and backtest_stats["return_percentage"] > 0) or
         (backtest_stats["win_rate"] > 60)
@@ -326,11 +325,10 @@ def get_backtest_result(
     else: 
         backtest_stats["notifications_on"] = False
         notifications_on = False
-=======
+    
     if backtest_stats["sharpe_ratio"] > 0 and backtest_stats["return_percentage"] > 0:
         backtest_stats["notifications_on"] = True
         notifications_on = True
->>>>>>> Stashed changes
     
     if strategy_id != None:
         backtest_stats["id"] = strategy_id
