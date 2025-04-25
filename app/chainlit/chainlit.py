@@ -54,6 +54,7 @@ def oauth_callback(
 
 @cl.on_chat_start
 async def on_chat_start():
+    
     settings = await cl.ChatSettings(
         [
             Select(
@@ -73,7 +74,7 @@ async def on_chat_start():
                 label="Google Gemini - Temperature",
                 initial=1,
                 min=0,
-                max=2,
+                max=1.0,
                 step=0.1,
             ),
             Slider(
@@ -202,3 +203,14 @@ async def on_settings_update(settings):
     print("on_settings_update", settings)
     cl.user_session.set("settings", settings)  # Store updated settings in session
     await setup_runnable(settings) # Re-setup the runnable with new settings
+
+
+@cl.set_chat_profiles
+async def chat_profile():
+    return [
+        cl.ChatProfile(
+            name="Okane Agents",
+            markdown_description="Discuss finance news and sentiment analysis.",
+            icon="/public/logo_light.png",
+        )
+    ]

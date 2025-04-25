@@ -7,6 +7,7 @@ from app.ai.router import router as aiRouter
 from app.notification.router import router as notificationRouter
 from fastapi.middleware.cors import CORSMiddleware
 from chainlit.utils import mount_chainlit
+from fastapi.staticfiles import StaticFiles
 
 origins = [
     "https://okane-signals.vercel.app",
@@ -36,10 +37,12 @@ app.include_router(tickerRouter)
 app.include_router(signalsRouter)
 app.include_router(aiRouter)
 app.include_router(notificationRouter)
-
+app.mount("/public", StaticFiles(directory="public"), name="public")
+app.mount("/logo", StaticFiles(directory="public"), name="public")
 
 @app.get("/", response_model=RootResponse)
 def read_root():
     return {"status": 200, "message": "Monii"}
 
 mount_chainlit(app=app, target="app/chainlit/chainlit.py", path="/chat")
+
