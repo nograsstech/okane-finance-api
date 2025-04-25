@@ -1,11 +1,11 @@
 import json
 import asyncio
 import uuid
-from IPython.display import Image, display
 from typing_extensions import TypedDict, Annotated
 
+from langgraph.store.memory import InMemoryStore
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.messages import ToolMessage, HumanMessage, AIMessage
-from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
@@ -13,15 +13,18 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.store.base import BaseStore
 
 # Import our custom modules and tools
-from app.ai.models.gemini import create_gemini_flash_model # Import the function
 from app.ai.tools.news_sentiment import news_sentiment_tool
 from app.ai.tools.get_yfinance_news import fetch_yfinance_news
-from app.ai.sentiment_analyzer import analyze_sentiment # analyze_sentiment now accepts LLM
-from langchain_core.language_models import BaseChatModel # Import for type hinting
+from app.ai.sentiment_analyzer import (
+    analyze_sentiment,
+)  # analyze_sentiment now accepts LLM
+from langchain_core.language_models import BaseChatModel  # Import for type hinting
 
 # Import and instantiate DuckDuckGoSearchRun
 from langchain_community.tools import DuckDuckGoSearchRun
+
 duckduckgo_search_tool = DuckDuckGoSearchRun()
+
 
 # ---------------------------
 # State
@@ -30,14 +33,17 @@ class State(TypedDict):
     # The "messages" key will accumulate messages (using add_messages for proper merging)
     messages: Annotated[list, add_messages]
 
+
 # ---------------------------
 # Tools
 # ---------------------------
 # List of tool instances; note that DuckDuckGoSearchRun is now instantiated.
 tools = [duckduckgo_search_tool, news_sentiment_tool, fetch_yfinance_news]
 
+
 class BasicToolNode:
     """A node that runs the tools requested in the last AIMessage."""
+
     def __init__(self, tools: list) -> None:
         # Create a mapping from tool name to tool instance
         self.tools_by_name = {tool.name: tool for tool in tools}
@@ -55,7 +61,7 @@ class BasicToolNode:
         for tool_call in message.tool_calls:
             tool = self.tools_by_name[tool_call["name"]]
             tool_args = tool_call["args"]
-            
+
             # Ensure tool_call_id is present and properly set
             tool_call_id = tool_call.get("id")
             if not tool_call_id:
@@ -77,7 +83,9 @@ class BasicToolNode:
                     )
                 )
             else:
-                raise ValueError(f"Tool {tool_call['name']} does not have 'run' or 'arun' method.")
+                raise ValueError(
+                    f"Tool {tool_call['name']} does not have 'run' or 'arun' method."
+                )
 
         print(f"tool_call in sync: {tool_call}")
         print(f"tool_call.keys() in sync: {tool_call.keys()}")
@@ -102,6 +110,8 @@ class BasicToolNode:
             )
 
         return {"messages": outputs}
+
+
 # ---------------------------
 # Grounding Agent
 # ---------------------------
@@ -115,6 +125,7 @@ async def search_grounding_agent(state: State):
     # performed by the tools node if the LLM decided to use DuckDuckGoSearchRun.
     messages = state.get("messages", [])
     return {"messages": messages}
+
 
 # ---------------------------
 # Sentiment Analysis Agent
@@ -147,14 +158,18 @@ async def sentiment_analysis_agent(state: State, llm: BaseChatModel):
     # If both tool responses are available, run the sentiment analyzer.
     if sentiment_data and yfinance_news:
         # Pass the LLM instance to the analyze_sentiment function
-        analysis = await analyze_sentiment({
-            "sentiment_data": sentiment_data,
-            "news": yfinance_news,
-            "search_results": search_results
-        }, llm=llm)
+        analysis = await analyze_sentiment(
+            {
+                "sentiment_data": sentiment_data,
+                "news": yfinance_news,
+                "search_results": search_results,
+            },
+            llm=llm,
+        )
         return {"messages": [AIMessage(content=analysis)]}
 
-    return {"messages": messages} # Preserve message history
+    return {"messages": messages}  # Preserve message history
+
 
 # ---------------------------
 # Routing Function for Tools
@@ -167,13 +182,18 @@ def check_sentiment_data_route(state: State):
     Routes to sentiment_analysis_agent if data is present, otherwise to format_final_response.
     """
     messages = state.get("messages", [])
-    sentiment_data_present = any(hasattr(msg, "name") and msg.name == "get_news_sentiment" for msg in messages)
-    yfinance_news_present = any(hasattr(msg, "name") and msg.name == "fetch_yfinance_news" for msg in messages)
+    sentiment_data_present = any(
+        hasattr(msg, "name") and msg.name == "get_news_sentiment" for msg in messages
+    )
+    yfinance_news_present = any(
+        hasattr(msg, "name") and msg.name == "fetch_yfinance_news" for msg in messages
+    )
 
     if sentiment_data_present and yfinance_news_present:
         return "sentiment_analysis_agent"
     else:
         return "format_final_response"
+
 
 # ---------------------------
 # Final Response Formatting Agent
@@ -196,7 +216,11 @@ async def format_final_response(state: State):
 
     # Find the sentiment analysis result (look for AIMessage with specific content pattern)
     for msg in reversed(messages):
-        if isinstance(msg, AIMessage) and msg.content and "**Sentiment Analysis:**" in msg.content:
+        if (
+            isinstance(msg, AIMessage)
+            and msg.content
+            and "**Sentiment Analysis:**" in msg.content
+        ):
             sentiment_analysis_content = msg.content
             break
 
@@ -209,18 +233,32 @@ async def format_final_response(state: State):
                 if isinstance(search_content, list):
                     # Format search results to include source if available
                     formatted_search_results = []
-                    for i, result in enumerate(search_content[:5]): # Limit to top 5 for brevity
-                        if isinstance(result, dict) and 'title' in result and 'link' in result:
-                             formatted_search_results.append(f"{i+1}. [{result['title']}]({result['link']})")
+                    for i, result in enumerate(
+                        search_content[:5]
+                    ):  # Limit to top 5 for brevity
+                        if (
+                            isinstance(result, dict)
+                            and "title" in result
+                            and "link" in result
+                        ):
+                            formatted_search_results.append(
+                                f"{i+1}. [{result['title']}]({result['link']})"
+                            )
                         else:
-                             formatted_search_results.append(f"{i+1}. {str(result)}") # Fallback formatting
-                    grounding_results_content = "Search Results:\n" + "\n".join(formatted_search_results)
+                            formatted_search_results.append(
+                                f"{i+1}. {str(result)}"
+                            )  # Fallback formatting
+                    grounding_results_content = "Search Results:\n" + "\n".join(
+                        formatted_search_results
+                    )
                 else:
-                    grounding_results_content = "Search Results:\n" + str(search_content)
-            except:
-                pass # Ignore if tool content is not JSON
-            break # Take the most recent search results
-
+                    grounding_results_content = "Search Results:\n" + str(
+                        search_content
+                    )
+            except Exception as e:
+                print(f"Error processing search results: {e}")
+                pass  # Ignore if tool content is not JSON
+            break  # Take the most recent search results
 
     response_content = f"Regarding your query: '{user_query}'\n\n"
 
@@ -228,15 +266,18 @@ async def format_final_response(state: State):
     if sentiment_analysis_content:
         response_content += sentiment_analysis_content
         if grounding_results_content:
-            response_content += "\n\n" + grounding_results_content # Add grounding results below sentiment analysis
+            response_content += (
+                "\n\n" + grounding_results_content
+            )  # Add grounding results below sentiment analysis
     elif grounding_results_content:
         response_content += "Could not perform sentiment analysis based on the available information, but here are some search results:\n\n"
         response_content += grounding_results_content
     else:
         response_content += "Could not find relevant information or perform analysis."
 
-
     return {"messages": [AIMessage(content=response_content)]}
+
+
 # ---------------------------
 def route_tools(state: State):
     """
@@ -251,9 +292,10 @@ def route_tools(state: State):
     # This function will now route based on whether the AI message has tool calls.
     # The actual routing logic in the graph will use this function.
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-        return "continue_tool_flow" # Route to the tool execution path
+        return "continue_tool_flow"  # Route to the tool execution path
     else:
-        return "end_chat" # Route directly to the end
+        return "end_chat"  # Route directly to the end
+
 
 # ---------------------------
 # LLM Agent Binding
@@ -261,10 +303,13 @@ def route_tools(state: State):
 # Remove global LLM binding
 # gemini2Flash_with_tools = gemini2Flash.bind_tools(tools)
 
+
 # ---------------------------
 # ChatBot Agent
 # ---------------------------
-async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseStore, llm: BaseChatModel):
+async def okane_chat_agent(
+    state: State, config: RunnableConfig, *, store: BaseStore, llm: BaseChatModel
+):
     """
     Chatbot agent that uses the LLM to generate responses, potentially calling tools.
     Accepts the LLM instance as an argument.
@@ -274,22 +319,25 @@ async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseS
     # Use attribute access for the message content
     memories = store.search(namespace, query=state["messages"][-1].content)
     info = "\\n".join([d.value["data"] for d in memories])
-    
+
     # Extract grounded search results from the state
     grounding_message = ""
     for msg in state["messages"]:
         # Look for the ToolMessage from DuckDuckGoSearchRun
         if isinstance(msg, ToolMessage) and msg.name == "DuckDuckGoSearchRun":
-             try:
-                 search_content = json.loads(msg.content)
-                 if isinstance(search_content, list):
-                     grounding_message = "Search Results:\n" + "\n".join(search_content[:3])
-                 else:
-                     grounding_message = "Search Results:\n" + str(search_content)
-             except:
-                 pass # Ignore if tool content is not JSON
-             break # Take the most recent search results
-            
+            try:
+                search_content = json.loads(msg.content)
+                if isinstance(search_content, list):
+                    grounding_message = "Search Results:\n" + "\n".join(
+                        search_content[:3]
+                    )
+                else:
+                    grounding_message = "Search Results:\n" + str(search_content)
+            except Exception as e:
+                print(f"Error processing search results: {e}")
+                pass  # Ignore if tool content is not JSON
+            break  # Take the most recent search results
+
     system_msg = (
         "You are a financial advisor. Please provide helpful and informative responses "
         "to the user's questions about finance. You have access to the following tools: "
@@ -299,13 +347,13 @@ async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseS
         "Prioritize using these tools, especially DuckDuckGoSearchRun and fetch_yfinance_news, "
         "when the user asks for news, sentiment, or general information about financial topics or specific tickers. "
         "Here's some context: "
-        f"{info}\\n{grounding_message}" # Incorporate grounding results
+        f"{info}\\n{grounding_message}"  # Incorporate grounding results
     )
 
     last_message = state["messages"][-1]
     store.put(namespace, str(uuid.uuid4()), {"data": last_message.content})
     if "remember" in last_message.content.lower():
-        pass # previously stored the message here, now storing all messages
+        pass  # previously stored the message here, now storing all messages
 
     messages = state.get("messages", [])
     if not messages:
@@ -314,12 +362,12 @@ async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseS
     try:
         # Ensure we don't send empty messages to the Gemini model
         formatted_messages = [{"role": "system", "content": system_msg}]
-        
+
         for msg in messages:
             # Skip any message with empty content
-            if not hasattr(msg, 'content') or not msg.content:
+            if not hasattr(msg, "content") or not msg.content:
                 continue
-                
+
             # Determine the role based on message type
             if isinstance(msg, HumanMessage):
                 role = "user"
@@ -331,47 +379,47 @@ async def okane_chat_agent(state: State, config: RunnableConfig, *, store: BaseS
                 tool_message = {
                     "role": role,
                     "content": msg.content,
-                    "name": getattr(msg, "name", "unknown_tool")
+                    "name": getattr(msg, "name", "unknown_tool"),
                 }
-                
+
                 # Only include tool_call_id if it exists to avoid KeyError
                 if hasattr(msg, "tool_call_id") and msg.tool_call_id is not None:
                     tool_message["tool_call_id"] = msg.tool_call_id
-                
+
                 formatted_messages.append(tool_message)
                 continue  # Skip the default append below
             else:
                 role = "user"  # Default fallback
-                
+
             formatted_messages.append({"role": role, "content": msg.content})
-        
+
         # Ensure we have at least one non-system message
         if len(formatted_messages) <= 1:
             # Add a fallback message if we somehow ended up with only the system message
-            formatted_messages.append({"role": "user", "content": "Tell me about financial advice."})
-            
+            formatted_messages.append(
+                {"role": "user", "content": "Tell me about financial advice."}
+            )
+
         # Bind tools to the passed LLM instance
         llm_with_tools = llm.bind_tools(tools)
         result = await llm_with_tools.ainvoke(formatted_messages)
-        store.put(namespace, str(uuid.uuid4()), {"data": result.content}) # Store the response
+        store.put(
+            namespace, str(uuid.uuid4()), {"data": result.content}
+        )  # Store the response
         return {"messages": [result]}
     except Exception as e:
         print(f"Error details in okane_chat_agent: {type(e)}, {str(e)}")
         # Add more detailed error handling/logging here
         raise ValueError(f"Error in okane_chat_agent: {e}")
 
+
 # ---------------------------
 # Memory Setup
 # ---------------------------
 memory = MemorySaver()
 
-from langgraph.store.memory import InMemoryStore
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-
 in_memory_store = InMemoryStore(
-    index={
-        "embed": GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    }
+    index={"embed": GoogleGenerativeAIEmbeddings(model="models/embedding-001")}
 )
 
 # ---------------------------
@@ -382,6 +430,7 @@ tool_node = BasicToolNode(tools=tools)
 
 # Remove global graph instance
 # graph = graph_builder.compile(checkpointer=memory, store=in_memory_store)
+
 
 def create_chatbot_graph(llm: BaseChatModel):
     """
@@ -394,7 +443,9 @@ def create_chatbot_graph(llm: BaseChatModel):
     graph_builder.add_edge(START, "okane_chat_agent")
 
     # Define wrapper functions to pass the LLM and await the agents
-    async def okane_chat_node(state: State, config: RunnableConfig, *, store: BaseStore):
+    async def okane_chat_node(
+        state: State, config: RunnableConfig, *, store: BaseStore
+    ):
         return await okane_chat_agent(state, config, store=store, llm=llm)
 
     async def sentiment_analysis_node(state: State):
@@ -403,9 +454,13 @@ def create_chatbot_graph(llm: BaseChatModel):
     # Add nodes using the wrapper functions
     graph_builder.add_node("okane_chat_agent", okane_chat_node)
     graph_builder.add_node("tools", tool_node)
-    graph_builder.add_node("grounding_agent", search_grounding_agent) # This agent is already async and passed directly
+    graph_builder.add_node(
+        "grounding_agent", search_grounding_agent
+    )  # This agent is already async and passed directly
     graph_builder.add_node("sentiment_analysis_agent", sentiment_analysis_node)
-    graph_builder.add_node("format_final_response", format_final_response) # This agent is already async and passed directly
+    graph_builder.add_node(
+        "format_final_response", format_final_response
+    )  # This agent is already async and passed directly
 
     # Conditional routing: if tool calls exist, run the "tools" node; otherwise, jump to grounding.
     # Conditional routing after okane_chat_agent: check for tool calls
@@ -413,11 +468,11 @@ def create_chatbot_graph(llm: BaseChatModel):
     # If no tool calls, route directly to END ("end_chat")
     graph_builder.add_conditional_edges(
         "okane_chat_agent",
-        route_tools, # Use the modified route_tools function
+        route_tools,  # Use the modified route_tools function
         {
-            "continue_tool_flow": "tools", # Route to tools if tool calls are present
-            "end_chat": END # Route directly to END if no tool calls
-        }
+            "continue_tool_flow": "tools",  # Route to tools if tool calls are present
+            "end_chat": END,  # Route directly to END if no tool calls
+        },
     )
 
     # The tool execution path: tools -> grounding_agent -> (sentiment_analysis_agent or format_final_response) -> format_final_response -> END
@@ -444,6 +499,7 @@ def create_chatbot_graph(llm: BaseChatModel):
     compiled_graph = graph_builder.compile(checkpointer=memory, store=in_memory_store)
 
     return compiled_graph
+
 
 # The graph is now created and compiled in create_chatbot_graph, not globally.
 # The get_langgraph_graph function might need adjustment if it was used elsewhere
