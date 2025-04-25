@@ -6,6 +6,7 @@ from app.signals.router import router as signalsRouter
 from app.ai.router import router as aiRouter
 from app.notification.router import router as notificationRouter
 from fastapi.middleware.cors import CORSMiddleware
+from chainlit.utils import mount_chainlit
 
 origins = [
     "https://okane-signals.vercel.app",
@@ -40,3 +41,5 @@ app.include_router(notificationRouter)
 @app.get("/", response_model=RootResponse)
 def read_root():
     return {"status": 200, "message": "Monii"}
+
+mount_chainlit(app=app, target="app/chainlit/chainlit.py", path="/chat")
