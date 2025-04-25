@@ -1,10 +1,10 @@
-from app.ai.chatbot import graph
+# from app.ai.chatbot import graph
 
 async def get_chatbot_response_stream(user_input: str, thread_id: str = "User"):
     print("user_input is:", user_input)
     print("Calling with thread_id:", thread_id)
     # Create an async stream - don't await since it's an async generator
-    stream = graph.astream(
+    stream = create_chatbot_graph().astream(
         {"messages": [("user", user_input)]},
         config={"configurable": {"thread_id": thread_id}},
         stream_mode=["messages", "values"]
@@ -18,7 +18,7 @@ async def get_chatbot_response_stream(user_input: str, thread_id: str = "User"):
 async def get_chatbot_response_async(user_input: str, thread_id: str = "User"):
   print("user_input is: ", user_input)
   print("Calling with thread_id: ", thread_id)
-  events = await graph.ainvoke(
+  events = await create_chatbot_graph().ainvoke(
       {"messages": [("user", user_input)]},
       config={"configurable": {"thread_id": thread_id }},
       stream_mode="values"
@@ -31,7 +31,7 @@ async def get_chatbot_response_async(user_input: str, thread_id: str = "User"):
           event["messages"][-1].pretty_print()
   return {"okaneChatBot": all_events}  # Return all events
 
-from app.ai.chatbot import in_memory_store
+from app.ai.chatbot import create_chatbot_graph, in_memory_store
 
 async def get_chat_history(thread_id: str):
     print("Getting chat history for thread_id:", thread_id)

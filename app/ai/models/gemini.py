@@ -29,14 +29,20 @@ financial_advisor_prompt = PromptTemplate.from_template(
 
 
 
-gemini2Flash = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-001",
-    temperature=0.6,
-    max_tokens=None,
-    timeout=None,
-    max_retries=4,
-    # other params...
-)
+def create_gemini_flash_model(model_name: str = "gemini-2.0-flash-001", temperature: float = 0.6):
+    """Creates a ChatGoogleGenerativeAI instance with specified model and temperature."""
+    return ChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=temperature,
+        max_tokens=None,
+        timeout=None,
+        max_retries=4,
+        # other params...
+    )
+
+# Keep the original gemini2Flash for backward compatibility if needed elsewhere,
+# but the LangGraph will use the function version.
+gemini2Flash = create_gemini_flash_model()
 
 gemini2FlashDiscordResponder = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash-001",
