@@ -21,6 +21,22 @@ cot = "full"
 # The CSS file can be served from the public directory or via an external link.
 # custom_css = "/public/test.css"
 
+
+# Custom login page image, relative to public directory or external URL
+login_page_image = "/public/auth-background.jpg"
+
+# Custom login page image filter (Tailwind internal filters, no dark/light variants)
+login_page_image_filter = "brightness-50 grayscale"
+login_page_image_dark_filter = "contrast-200 blur-sm"
+
+# Path to your logo, relative to public directory or external URL
+logo = "/public/logo_light.png"
+# Path to your favicon, relative to public directory or external URL
+# favicon = "/public/favicon.ico"
+
+# Path to your dark mode logo, relative to public directory or external URL
+logo_dark = "/public/logo_dark.png"
+
 [UI.theme]
   #layout = "wide"
   #font_family = "Inter, sans-serif"
