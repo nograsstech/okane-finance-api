@@ -1,7 +1,7 @@
-from app.ai.models.gemini import gemini2Flash
 import json
+from langchain_core.language_models import BaseChatModel # Import the base class for type hinting
 
-async def analyze_sentiment(sentiment_data):
+async def analyze_sentiment(sentiment_data, llm: BaseChatModel):
     prompt = f"""
             The overall sentiment score from Alpha Vantage typically ranges from -1 to 1. This scoring system is designed to quantify the sentiment expressed in qualitative data, such as financial news or social media comments, providing a clear indication of market sentiment.
 
@@ -52,5 +52,5 @@ async def analyze_sentiment(sentiment_data):
             Use the news data to provide additional context for the sentiment analysis.
             """
     messages = [{"role": "user", "content": prompt}]
-    result = await gemini2Flash.ainvoke(messages)
+    result = await llm.ainvoke(messages)
     return result.content

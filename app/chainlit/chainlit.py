@@ -1,44 +1,40 @@
 from operator import itemgetter
 from typing import Dict, Optional
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import Runnable, RunnablePassthrough, RunnableLambda
-from langchain.schema.runnable.config import RunnableConfig
+from operator import itemgetter
+from typing import Dict, Optional
+from langchain_google_genai import ChatGoogleGenerativeAI # Keep for type hinting if needed, but not for instantiation
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder # Keep if used elsewhere, but not in setup_runnable
+from langchain.schema.output_parser import StrOutputParser # Keep if used elsewhere
+from langchain.schema.runnable import Runnable, RunnablePassthrough, RunnableLambda # Keep if used elsewhere
+# from langchain.schema.runnables.config import RunnableConfig
+from langchain_core.runnables import RunnableConfig
 from langchain.memory import ConversationBufferMemory
 from chainlit.types import ThreadDict
 from chainlit.input_widget import Select, Switch, Slider
+from app.ai.chatbot import create_chatbot_graph, State # Import the graph creation function and State
+from app.ai.models.gemini import create_gemini_flash_model # Import the model creation function
+from langchain_core.messages import HumanMessage, AIMessage # Import necessary message types
+from langchain_core.language_models import BaseChatModel # Import for type hinting
 
 import chainlit as cl
 
 
-async def setup_runnable(settings):
-    memory = cl.user_session.get("memory")
+async def setup_runnable(settings: Dict):
+    """
+    Sets up the LangGraph runnable with the selected LLM model.
+    """
+    # Retrieve model settings
+    gemini_model_name = settings.get("Gemini_Model", "gemini-2.0-flash")
+    gemini_temperature = settings.get("Gemini_Temperature", 1.0) # Ensure float type
 
-    gemini_model = settings.get("Gemini_Model", "gemini-2.0-flash")
-    gemini_temperature = settings.get("Gemini_Temperature", 1)
+    # Create the LLM instance using the function from models.gemini
+    llm = create_gemini_flash_model(model_name=gemini_model_name, temperature=gemini_temperature)
 
-    model = ChatGoogleGenerativeAI(
-        model=gemini_model, temperature=gemini_temperature, streaming=True
-    )
+    # Create and compile the chatbot graph with the selected LLM
+    compiled_graph = create_chatbot_graph(llm=llm)
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful chatbot"),
-            MessagesPlaceholder(variable_name="history"),
-            ("human", "{question}"),
-        ]
-    )
-
-    runnable = (
-        RunnablePassthrough.assign(
-            history=RunnableLambda(memory.load_memory_variables) | itemgetter("history")
-        )
-        | prompt
-        | model
-        | StrOutputParser()
-    )
-    cl.user_session.set("runnable", runnable)
+    # Store the compiled graph in the user session
+    cl.user_session.set("runnable", compiled_graph)
 
 
 @cl.password_auth_callback
@@ -119,8 +115,9 @@ async def on_chat_start():
         ]
     ).send()
 
-    cl.user_session.set("memory", ConversationBufferMemory(return_messages=True))
-    await setup_runnable(settings)
+    # Memory is handled in on_chat_start and on_chat_resume, no need to set here
+    # cl.user_session.set("memory", ConversationBufferMemory(return_messages=True))
+    await setup_runnable(settings) # Call setup_runnable with the initial settings
 
 
 @cl.on_chat_resume
@@ -136,20 +133,22 @@ async def on_chat_resume(thread: ThreadDict):
     cl.user_session.set("memory", memory)
 
     settings = cl.user_session.get("settings")  # Retrieve settings from session
-    
-    print("\nSettings:", settings, "\n")
-    
+
+    # Ensure settings are available, initialize with defaults if not
     if settings is None:
-        # Initialize with default settings if not found in session
         settings = {
             "Gemini_Model": "gemini-2.0-flash",
-            "Gemini_Temperature": 1,
+            "Gemini_Temperature": 1.0, # Ensure float type
             "SAI_Steps": 30,
             "SAI_Cfg_Scale": 7,
             "SAI_Width": 512,
             "SAI_Height": 512,
         }
-    await setup_runnable(settings)
+        cl.user_session.set("settings", settings) # Store defaults if initializing
+
+    print("\nSettings:", settings, "\n")
+
+    await setup_runnable(settings) # Call setup_runnable with the retrieved/default settings
 
 
 @cl.on_message
@@ -164,13 +163,35 @@ async def on_message(message: cl.Message):
 
     res = cl.Message(content="")
 
-    async for chunk in runnable.astream(
-        {"question": message.content},
-        config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()]),
-    ):
-        await res.stream_token(chunk)
+    # Invoke the LangGraph graph
+    initial_state = State(messages=[HumanMessage(content=message.content)])
 
-    await res.send()
+    # Invoke the LangGraph graph to get the final state
+    final_state = await runnable.ainvoke(
+        initial_state,
+        config=RunnableConfig(
+            callbacks=[cl.LangchainCallbackHandler()],
+            configurable={"thread_id": message.thread_id}
+        ),
+    )
+
+    # Extract the final AI message from the state
+    final_ai_message = None
+    if "messages" in final_state:
+        # Iterate in reverse to find the most recent AIMessage
+        for msg in reversed(final_state["messages"]):
+            if isinstance(msg, AIMessage):
+                final_ai_message = msg
+                break
+
+    # Send the content of the final AI message
+    if final_ai_message and final_ai_message.content:
+        res.content = final_ai_message.content
+        await res.send()
+    else:
+        # Handle case where no final AI message was found
+        res.content = "Sorry, I could not generate a response."
+        await res.send()
 
     memory.chat_memory.add_user_message(message.content)
     memory.chat_memory.add_ai_message(res.content)
@@ -180,4 +201,4 @@ async def on_message(message: cl.Message):
 async def on_settings_update(settings):
     print("on_settings_update", settings)
     cl.user_session.set("settings", settings)  # Store updated settings in session
-    await setup_runnable(settings)
+    await setup_runnable(settings) # Re-setup the runnable with new settings
