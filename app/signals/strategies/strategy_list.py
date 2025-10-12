@@ -14,5 +14,6 @@ strategy_list = [
     
     
     "grid_trading",
-    "super_safe_strategy"
+    "super_safe_strategy",
+    "fvg_confirmation"
 ]

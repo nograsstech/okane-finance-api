@@ -223,10 +223,6 @@ websockets==14.2
 wrapt==1.17.2
 wsproto==1.2.0
 yarl==1.18.3
-<<<<<<< Updated upstream
-yfinance==0.2.54
 zipp==3.21.0
-=======
 yfinance==0.2.61
->>>>>>> Stashed changes
 zstandard==0.23.0
