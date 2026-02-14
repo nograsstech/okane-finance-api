@@ -164,9 +164,9 @@ def backtest(df, strategy_parameters=None, skip_optimization=False, best_params=
 
     if (not skip_optimization): 
         print("Optimizing...")
-        bt_best = Backtest(dftest, GridTradingStrategy, cash=cash, hedging=True, margin=margin, commission=commission)
-        stats = bt_best.run()
-        stats, heatmap = bt_best.optimize(
+        bt_temp = Backtest(dftest, GridTradingStrategy, cash=cash, hedging=True, margin=margin, commission=commission)
+        # We need to run once to initialize any class attributes if needed, but optimize will handle it.
+        stats, heatmap = bt_temp.optimize(
                             grid_distance=[i for i in range(10, 50, 5)],
                             grid_range=[1000],
                             maximize='Max. Drawdown [%]', max_tries=500,
@@ -175,8 +175,7 @@ def backtest(df, strategy_parameters=None, skip_optimization=False, best_params=
         # Convert multiindex series to dataframe
         heatmap_df = heatmap.unstack()
         # find the one best parameters from heatmap_df
-        best_params = heatmap_df.idxmax()
-
+        
         # Find the maximum value over the entire DataFrame
         max_value = heatmap_df.max().max()
 
@@ -186,13 +185,23 @@ def backtest(df, strategy_parameters=None, skip_optimization=False, best_params=
         best_params = {}
         best_params['grid_distance'] = optimized_params[0]
 
-        print(best_params)
+        print("Optimized best params:", best_params)
     else:
         print("Optimization is skipped and best params provided", best_params)
 
+    # Ensure grid_distance is in best_params
+    grid_distance = best_params.get('grid_distance')
+    if grid_distance is None:
+        grid_distance = 25 # Default value
+        best_params['grid_distance'] = grid_distance
+
+    # Run the backtest with the final parameters
+    bt_best = Backtest(dftest, GridTradingStrategy, cash=cash, hedging=True, margin=margin, commission=commission)
+    stats = bt_best.run(grid_distance=grid_distance)
+
     strategy_parameters = {
         "best": True,
-        "grid_distance": best_params['grid_distance']
+        "grid_distance": grid_distance
     }
     print("Final strategy parameters:", strategy_parameters)
     

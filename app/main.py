@@ -42,7 +42,7 @@ app.mount("/logo", StaticFiles(directory="public"), name="public")
 
 @app.get("/", response_model=RootResponse)
 def read_root():
-    return {"status": 200, "message": "Monii"}
+    return {"status": 200, "message": "Monii 0.1.0"}
 
 mount_chainlit(app=app, target="app/chainlit/chainlit.py", path="/chat")
 

@@ -21,3 +21,4 @@ pip install "fastapi[standard]"
 fastapi dev --host 127.0.0.1 --port 8000 app/main.py
 ```
 
+fastapi run app/main.py --host 127.0.0.1 --port 8000

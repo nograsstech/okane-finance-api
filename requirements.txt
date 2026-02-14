@@ -17,11 +17,13 @@ bidict==0.23.1
 bokeh==2.4.3
 cachetools==5.5.1
 certifi==2025.1.31
+cffi==2.0.0
 chainlit==2.5.5
 charset-normalizer==3.4.1
 chevron==0.14.0
 click==8.1.8
 colorama==0.4.6
+curl_cffi==0.13.0
 dataclasses-json==0.6.7
 decorator==5.1.1
 Deprecated==1.2.18
@@ -145,7 +147,7 @@ opentelemetry-util-http==0.52b1
 orjson==3.10.15
 packaging==24.2
 pandas==2.2.3
-pandas-ta==0.3.14b0
+vendor/pandas_ta-0.3.14b0-py3-none-any.whl
 parso==0.8.4
 peewee==3.17.9
 pexpect==4.9.0
@@ -162,6 +164,7 @@ ptyprocess==0.7.0
 pure_eval==0.2.3
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
+pycparser==2.23
 pydantic==2.10.6
 pydantic-settings==2.7.1
 pydantic_core==2.27.2
@@ -223,6 +226,6 @@ websockets==14.2
 wrapt==1.17.2
 wsproto==1.2.0
 yarl==1.18.3
+yfinance==0.2.66
 zipp==3.21.0
-yfinance==0.2.61
 zstandard==0.23.0

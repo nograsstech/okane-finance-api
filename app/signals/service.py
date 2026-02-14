@@ -208,6 +208,15 @@ def get_backtest_result(
         skip_optimization,
         best_params,
     )
+    
+    # # Print resulting trade actions
+    # print("\n--- Trade Actions ---\n")
+    # print(trade_actions)
+
+    # if bt is None or stats is None:
+    #     raise HTTPException(
+    #         status_code=400, detail=f"Failed to perform backtest for strategy: {strategy}"
+    #     )
 
     print(f"\n--- Creating backtest result HTML ---\n")
     bt.plot(open_browser=False, filename="backtest.html")
@@ -450,9 +459,10 @@ def strategy_notification_job():
                 notifications_on=strategy["notifications_on"],
                 skip_optimization=time_difference < 3, # Reoptimize every 3 days
                 best_params={
-                    "tpslRatio": strategy['tpsl_ratio'],
-                    "slcoef": strategy['sl_coef'],
-                    "TPcoef": strategy['tp_coef']
+                    "tpslRatio": strategy.get('tpsl_ratio'),
+                    "slcoef": strategy.get('sl_coef'),
+                    "TPcoef": strategy.get('tp_coef'),
+                    "grid_distance": strategy.get('grid_distance')
                 },
             )
         except Exception as e:

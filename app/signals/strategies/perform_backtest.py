@@ -35,7 +35,8 @@ def perform_backtest(df, strategy, parameters, skip_optimization=False, best_par
     except Exception as e:
         print("perform_backtest: ERROR__________________")
         print(e)
-        return None
+        # Return empty values to avoid unpacking errors in the caller
+        return None, None, [], {}
 
 
 async def perform_backtest_async(df, strategy, parameters):
