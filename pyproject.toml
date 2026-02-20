@@ -1,0 +1,231 @@
+[project]
+name = "okane-finance-api"
+version = "0.1.0"
+description = "Okane Finance API — signals, AI, and financial data platform"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # ── Web Framework ──────────────────────────────────────────────────────────
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "starlette>=0.41.0",
+    "python-multipart>=0.0.18",
+    "aiofiles>=24.1.0",
+
+    # ── Data Validation & Typing ───────────────────────────────────────────────
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "annotated-types>=0.7.0",
+
+    # ── AI / LLM ───────────────────────────────────────────────────────────────
+    "openai>=1.76.0",
+    "anthropic>=0.50.0",
+    "google-generativeai>=0.8.4",
+    "google-ai-generativelanguage>=0.6.15",
+    "google-api-core>=2.24.0",
+    "google-api-python-client>=2.161.0",
+    "google-auth>=2.38.0",
+    "google-auth-httplib2>=0.2.0",
+    "googleapis-common-protos>=1.67.0",
+
+    # ── LangChain / LangGraph ─────────────────────────────────────────────────
+    "langchain>=0.3.19",
+    "langchain-community>=0.3.17",
+    "langchain-core>=0.3.35",
+    "langchain-google-genai>=2.0.9",
+    "langchain-text-splitters>=0.3.6",
+    "langgraph>=0.2.73",
+    "langgraph-checkpoint>=2.0.15",
+    "langgraph-sdk>=0.1.51",
+    "langsmith>=0.3.8",
+
+    # ── Chainlit ──────────────────────────────────────────────────────────────
+    "chainlit>=2.5.5",
+    "literalai>=0.1.201",
+
+    # ── MCP ───────────────────────────────────────────────────────────────────
+    "mcp>=1.6.0",
+
+    # ── Data Processing ───────────────────────────────────────────────────────
+    "pandas>=2.2.0",
+    "numpy>=1.26.0,<2.0",  # pandas_ta vendor wheel uses numpy.NaN, removed in numpy 2.x
+    "pandas-ta",  # vendor wheel — see [tool.uv.sources]
+    "scipy>=1.14.0",
+    "scikit-learn>=1.6.0",
+    "backtesting>=0.6.1",
+    "bokeh>=2.4.3",
+
+    # ── Financial Data ────────────────────────────────────────────────────────
+    "yfinance>=0.2.66",
+
+    # ── Database ──────────────────────────────────────────────────────────────
+    "motor>=3.7.0",
+    "pymongo>=4.11.0",
+    "peewee>=3.17.9",
+    "sqlalchemy>=2.0.38",
+    "dnspython>=2.7.0",
+
+    # ── Supabase ──────────────────────────────────────────────────────────────
+    "supabase>=2.13.0",
+    "gotrue>=2.11.0",
+    "storage3>=0.11.0",
+    "postgrest>=0.19.0",
+    "supafunc>=0.9.0",
+    "realtime>=2.3.0",
+
+    # ── HTTP / Async ──────────────────────────────────────────────────────────
+    "httpx>=0.28.0",
+    "httpx-sse>=0.4.0",
+    "aiohttp>=3.11.0",
+    "requests>=2.32.0",
+    "requests-toolbelt>=1.0.0",
+    "curl-cffi>=0.13.0",
+
+    # ── Discord ───────────────────────────────────────────────────────────────
+    "discord.py>=2.5.0",
+
+    # ── Observability / Logging ───────────────────────────────────────────────
+    "loguru>=0.7.2",
+    "traceloop-sdk>=0.39.3",
+    "opentelemetry-api>=1.31.0",
+    "opentelemetry-sdk>=1.31.0",
+    "opentelemetry-exporter-otlp>=1.31.0",
+    "opentelemetry-exporter-otlp-proto-common>=1.31.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.31.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.31.0",
+    "opentelemetry-instrumentation>=0.52b1",
+    "opentelemetry-instrumentation-logging>=0.52b1",
+    "opentelemetry-instrumentation-requests>=0.52b1",
+    "opentelemetry-instrumentation-sqlalchemy>=0.52b1",
+    "opentelemetry-instrumentation-threading>=0.52b1",
+    "opentelemetry-instrumentation-urllib3>=0.52b1",
+    "opentelemetry-instrumentation-openai>=0.39.3",
+    "opentelemetry-instrumentation-anthropic>=0.39.3",
+    "opentelemetry-instrumentation-langchain>=0.39.3",
+    "opentelemetry-instrumentation-google-generativeai>=0.39.3",
+    "opentelemetry-semantic-conventions>=0.52b1",
+    "opentelemetry-semantic-conventions-ai>=0.4.3",
+    "opentelemetry-util-http>=0.52b1",
+    "opentelemetry-proto>=1.31.0",
+    "uptrace>=1.31.0",
+    "posthog>=3.25.0",
+
+    # ── Serialization / Utils ─────────────────────────────────────────────────
+    "orjson>=3.10.0",
+    "PyYAML>=6.0.2",
+    "python-dateutil>=2.9.0",
+    "pytz>=2025.1",
+    "tzdata>=2025.1",
+    "packaging>=24.2",
+    "tenacity>=9.0.0",
+    "backoff>=2.2.1",
+    "asyncer>=0.0.7",
+    "nest-asyncio>=1.6.0",
+    "syncer>=2.0.3",
+
+    # ── Auth / Security ───────────────────────────────────────────────────────
+    "PyJWT>=2.10.0",
+    "bcrypt>=4.0.0",
+    "email-validator>=2.2.0",
+    "cryptography>=43.0.0",
+
+    # ── gRPC ──────────────────────────────────────────────────────────────────
+    "grpcio>=1.70.0",
+    "grpcio-status>=1.70.0",
+    "protobuf>=5.29.0",
+    "proto-plus>=1.26.0",
+
+    # ── Web Scraping ──────────────────────────────────────────────────────────
+    "beautifulsoup4>=4.13.0",
+    "lxml>=5.3.0",
+    "duckduckgo-search>=7.5.2",
+    "html5lib>=1.1",
+    "huggingface-hub>=0.30.0",
+    "tiktoken>=0.9.0",
+
+    # ── Misc ──────────────────────────────────────────────────────────────────
+    "rich>=13.9.0",
+    "rich-toolkit>=0.13.0",
+    "typer>=0.15.0",
+    "click>=8.1.0",
+    "pillow>=11.1.0",
+    "filelock>=3.18.0",
+    "cachetools>=5.5.0",
+    "dataclasses-json>=0.6.7",
+    "marshmallow>=3.26.0",
+    "bidict>=0.23.0",
+    "frozendict>=2.4.0",
+    "sse-starlette>=2.3.0",
+    "python-socketio>=5.13.0",
+    "python-engineio>=4.12.0",
+    "websockets>=14.2",
+    "msgpack>=1.1.0",
+    "monotonic>=1.6",
+    "distro>=1.9.0",
+    "jiter>=0.9.0",
+    "joblib>=1.4.0",
+    "regex>=2024.11.6",
+    "colorama>=0.4.6",
+    "chevron>=0.14.0",
+    "inflection>=0.5.1",
+    "Lazify>=0.4.0",
+    "fsspec>=2025.3.0",
+
+    # ── Legacy compatibility ───────────────────────────────────────────────────
+    # pkg_resources is required by the vendored pandas_ta wheel. setuptools>=81
+    # removed pkg_resources; pinning to <81 restores it.
+    "setuptools>=76.0.0,<81",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "black>=24.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "ipython>=8.18.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "black>=24.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "ipython>=8.18.0",
+]
+
+[tool.uv.sources]
+# Local vendor wheel (not on PyPI)
+pandas-ta = { path = "vendor/pandas_ta-0.3.14b0-py3-none-any.whl" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

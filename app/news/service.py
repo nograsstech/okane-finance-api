@@ -34,10 +34,10 @@ async def fetch_alpha_vantage_news(_params: AlphaVantageNewsQueryDTO):
     params = {
         "function": "NEWS_SENTIMENT",
         "apikey": os.environ["ALPHA_VANTAGE_API_KEY"],
-        "from_date": _params.get('from_date'),
-        "to_date": _params.get('to_date'),
-        "tickers": _params.get('tickers'),
-        "limit": _params.get('limit'),
+        "from_date": _params.from_date,
+        "to_date": _params.to_date,
+        "tickers": _params.tickers,
+        "limit": _params.limit,
         "sort": "RELEVANCE",
     }
 
