@@ -1,7 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pnc
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Logging
+logs/
+*.log
+log/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Type Checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Linting
+.ruff_cache/
+.cache/
+
+# Data Cache
+cache/
+*.cache
+
+# Chainlit
+.chainlit/
+.files/
+
+# Git
+.git/
+.gitignore
+
+# Docker
 Dockerfile
-README.md
-*.pyc
-*.pyo
-*.pyd
-__pycache__
-.pytest_cache
+docker-compose.yml
+.dockerignore
+
+# Documentation
+docs/
+
+# Misc
+*.tmp
+*.bak
+temp.html
+memory-bank/

@@ -15,7 +15,7 @@ router = APIRouter(
 
 @router.get("/", response_model=AlphaVantageNewsResponseDTO, status_code=HTTP_200_OK)
 async def archive_ticker_news(params: AlphaVantageNewsQueryDTO = Depends()):
-    return await service(params)
+    return await service.fetch_alpha_vantage_news(params)
 
 
 @router.get("/6h", status_code=HTTP_200_OK)
