@@ -47,11 +47,11 @@ RUN useradd -m -u 1000 appuser
 WORKDIR /app
 
 # Copy virtual environment from builder stage
-COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
-# Create necessary directories with correct ownership
-RUN mkdir -p /app/logs /app/cache /app/.files && \
-    chown -R appuser:appuser /app/logs /app/cache /app/.files
+# Create necessary directories and set ownership for entire /app
+RUN mkdir -p /app/logs /app/cache && \
+    chown -R appuser:appuser /app
 
 # Copy application code
 COPY --chown=appuser:appuser app ./app
