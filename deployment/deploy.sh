@@ -82,21 +82,16 @@ show_status() {
 health_check() {
     log_info "Performing health check..."
 
-    local timeout=30
-    local elapsed=0
-    local interval=1
+    # Wait for container to start
+    sleep 20
 
-    while [ $elapsed -lt $timeout ]; do
-        if curl -f http://localhost:8000/ > /dev/null 2>&1; then
-            log_info "Health check passed! (ready in ${elapsed}s)"
-            return 0
-        fi
-        sleep $interval
-        elapsed=$((elapsed + interval))
-    done
-
-    log_error "Health check failed! Timeout after ${timeout}s"
-    return 1
+    if curl -f http://localhost:8000/ > /dev/null 2>&1; then
+        log_info "Health check passed!"
+        return 0
+    else
+        log_error "Health check failed!"
+        return 1
+    fi
 }
 
 # Main deployment flow
