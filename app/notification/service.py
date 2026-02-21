@@ -41,20 +41,33 @@ def send_discord_notification(message: str) -> None:
 
     Returns:
         None
+
+    Raises:
+        ValueError: If DISCORD_WEBHOOK_URL is not set or is empty.
+        HTTPException: If the request to Discord webhook fails.
     """
+    url = os.environ.get("DISCORD_WEBHOOK_URL")
+    if not url:
+        error_msg = "DISCORD_WEBHOOK_URL environment variable is not set"
+        print(f"Failed to send Discord notification: {error_msg}")
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+
     try:
-        print("Sending Discord notification...", message)
-        url = os.environ.get("DISCORD_WEBHOOK_URL")
+        print("Sending Discord notification...", message[:200] + "..." if len(message) > 200 else message)
         headers = {
             "Content-Type": "application/json",
         }
         data = {"content": message}
-        requests.post(url, headers=headers, data=json.dumps(data))
-        logging.info(f"Discord notification sent successfully.\nMessage: {message}")
-    except Exception as e:
-        print(f"Failed to send Discord notification. Error: {e}")
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        response.raise_for_status()
+        logging.info(f"Discord notification sent successfully.\nMessage: {message[:200]}")
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Failed to send Discord notification. Error: {e}"
+        print(error_msg)
+        logging.error(error_msg, exc_info=True)
         raise HTTPException(
-            status_code=400, detail=f"Failed to send Discord notification. Error: {e}"
+            status_code=400, detail=error_msg
         )
 
 def send_trade_action_notification(

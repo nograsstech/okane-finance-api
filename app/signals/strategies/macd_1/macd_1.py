@@ -70,13 +70,13 @@ def macd_1(df, df1d, parameters):
   # Assign Total signals
   def TotalSignal(df, l):
     if (
-        df.MACDSignal[l]==1
+        df.MACDSignal.iloc[l]==1
         # and df.RSI_Signal[l]==1
         # and df.MASignal[l]==1
     ):
             return 2
     if (
-        df.MACDSignal[l]==-1
+        df.MACDSignal.iloc[l]==-1
         # and df.RSI_Signal[l]==-1
         # and df.MASignal[l]==-1
     ):
