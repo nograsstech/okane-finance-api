@@ -33,9 +33,9 @@ def getYFinanceData(ticker, interval, period=None, start=None, end=None):
   end, start = get_dates(period)
 
   if period != None:
-    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False)
+    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False, auto_adjust=True)
   else:
-    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False)
+    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False, auto_adjust=True)
 
   dataF.iloc[:, :]
 
@@ -76,9 +76,9 @@ async def getYFinanceDataAsync(ticker, interval, period=None, start=None, end=No
   end, start = get_dates(period)
 
   if period != None:
-    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False)
+    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False, auto_adjust=True)
   else:
-    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False)
+    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False, auto_adjust=True)
 
   dataF.iloc[:, :]
 

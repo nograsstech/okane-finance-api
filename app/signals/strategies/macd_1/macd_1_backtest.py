@@ -177,7 +177,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     MyStrat.slcoef = strategy_parameters["slcoef"]
     MyStrat.TPSLRatio = strategy_parameters["tpslRatio"]
 
-    bt_best = Backtest(dftest, MyStrat, cash=cash, margin=margin)
+    bt_best = Backtest(dftest, MyStrat, cash=cash, margin=margin, finalize_trades=True)
     stats = bt_best.run()
     trades_actions = bt_best._strategy.trades_actions
 

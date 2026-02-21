@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(chmod:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(zip:*)",
+      "Bash(uv lock:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

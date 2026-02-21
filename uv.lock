@@ -3411,7 +3411,7 @@ dependencies = [
     { name = "pandas" },
 ]
 wheels = [
-    { filename = "pandas_ta-0.3.14b0-py3-none-any.whl", hash = "sha256:57bb974f6ea1f7a64fb2b0a6b128751cc7d4cfe271f149a281729164d8581a21" },
+    { filename = "pandas_ta-0.3.14b0-py3-none-any.whl", hash = "sha256:0eecb27d2da9d41442f925bc70a4a235c42cfd87016658a698e39a6a17eecfc2" },
 ]
 
 [package.metadata]

@@ -3,12 +3,20 @@ import base64
 import json
 import logging
 import os
+import warnings
 import zlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from starlette.status import HTTP_200_OK
+
+# Suppress bokeh np.datetime64 timezone warning
+warnings.filterwarnings(
+    "ignore",
+    message="no explicit representation of timezones available for np.datetime64",
+    module="bokeh",
+)
 
 from app.db.postgres import AsyncSessionLocal
 from app.db.repository import (
@@ -25,9 +33,7 @@ from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
 executor = ThreadPoolExecutor(max_workers=5)
 
 
-async def get_signals(
-    ticker, interval, period, strategy, parameters, start=None, end=None
-):
+async def get_signals(ticker, interval, period, strategy, parameters, start=None, end=None):
     """Retrieves signals for a given ticker using the specified parameters."""
     try:
         df = None
@@ -37,17 +43,13 @@ async def get_signals(
             if strategy == "macd_1":
                 df1d = getYFinanceData(ticker, "1d", period, start, end)
         except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Failed to calculate signals. Error: {e}"
-            )
+            raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
 
         signals_df = None
         try:
             signals_df = await calculate_signals_async(df, df1d, strategy, parameters)
         except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Failed to calculate signals. Error: {e}"
-            )
+            raise HTTPException(status_code=400, detail=f"Failed to calculate signals. Error: {e}")
         current_signal = signals_df.iloc[-1]
         current_signal = json.loads(current_signal.to_json())
 
@@ -106,9 +108,7 @@ async def get_backtest_result(
     try:
         parameters_dict = json.loads(parameters) if parameters is not None else {}
     except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to parse parameters. Error: {e}"
-        )
+        raise HTTPException(status_code=400, detail=f"Failed to parse parameters. Error: {e}")
 
     # -----------------------------------------------------------------
     # Run CPU-bound work in a thread (doesn't block the event loop)
@@ -141,14 +141,13 @@ async def get_backtest_result(
         bt, stats, trade_actions, strategy_parameters = await asyncio.to_thread(_run_backtest)
         if bt is None or stats is None:
             raise HTTPException(
-                status_code=400, detail="Backtest returned no results (strategy calculation may have failed or no trades were executed)."
+                status_code=400,
+                detail="Backtest returned no results (strategy calculation may have failed or no trades were executed).",
             )
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(
-            status_code=400, detail=f"Failed to run backtest. Error: {e}"
-        )
+        raise HTTPException(status_code=400, detail=f"Failed to run backtest. Error: {e}")
 
     # Generate the HTML plot (also sync/CPU-bound)
     def _render_html():
@@ -187,8 +186,11 @@ async def get_backtest_result(
     saved_trade_actions = result["trade_actions"]
 
     print("\n--- Sending trade action notifications ---\n")
+    print(
+        f"Notifications flag: {notifications_on}, Trade actions count: {len(saved_trade_actions)}"
+    )
     if notifications_on and saved_trade_actions:
-        print("Sending trade action notification to LINE group...")
+        print(f"Sending trade action notification for {len(saved_trade_actions)} actions...")
         try:
             send_trade_action_notification(
                 strategy=strategy,
@@ -196,8 +198,18 @@ async def get_backtest_result(
                 interval=interval,
                 trade_actions=saved_trade_actions,
             )
+            print("Trade action notification sent successfully.")
+        except ValueError as e:
+            logging.error(f"Configuration error for notification: {e}")
+            print(f"ERROR: Notification not configured - {e}")
         except Exception as e:
-            logging.error(f"Failed to send LINE notification. Error: {e}")
+            logging.error(f"Failed to send notification. Error: {e}", exc_info=True)
+            print(f"ERROR: Failed to send notification - {e}")
+    else:
+        if not notifications_on:
+            print("Notifications disabled for this strategy (notifications_on=False).")
+        if not saved_trade_actions:
+            print("No trade actions to notify about.")
 
     print("\n--- COMPLETE ---\n")
 
@@ -304,16 +316,19 @@ async def _persist_backtest_result(
         # Upsert backtest_stats
         updated_stat = None
         try:
-            logging.info("Saving backtest stats to DB. Ticker: %s", ticker)
+            logging.info(
+                "Saving backtest stats to DB. Ticker: %s. Strategy: %s. Strategy ID: %s",
+                ticker,
+                strategy,
+                strategy_id,
+            )
             updated_stat = await backtest_repo.upsert(backtest_stats_data)
         except Exception as e:
             logging.error("Failed to save backtest stats: %s", e)
 
         # Determine which trade actions are "new" by querying against the correct backtest_stat ID
         if updated_stat is not None:
-            print(f"[dedup] Querying latest trade action for backtest_stat.id={updated_stat.id}")
             latest_ta = await trade_repo.get_latest_for_strategy(updated_stat.id)
-            print(f"[dedup] Total backtest trade actions before filter: {len(trade_actions)}")
 
             if latest_ta is not None:
                 # Strip tzinfo from both sides so naive/aware mismatches never raise TypeError.
@@ -321,7 +336,6 @@ async def _persist_backtest_result(
                 cutoff_dt = latest_ta.datetime
                 if hasattr(cutoff_dt, "tzinfo") and cutoff_dt.tzinfo is not None:
                     cutoff_dt = cutoff_dt.replace(tzinfo=None)
-                print(f"[dedup] Cutoff datetime (latest DB trade action): {cutoff_dt!r}")
 
                 new_trade_actions = []
                 for ta in trade_actions:
@@ -332,19 +346,12 @@ async def _persist_backtest_result(
                         try:
                             ta_dt = datetime.strptime(raw_dt, "%Y-%m-%d %H:%M:%S")
                         except (ValueError, TypeError):
-                            logging.warning(
-                                "[dedup] Could not parse trade action datetime: %s — skipping", raw_dt
-                            )
                             continue
                     passed = ta_dt > cutoff_dt
-                    print(f"[dedup]   ta_dt={ta_dt!r} > cutoff={cutoff_dt!r} → {passed}")
                     if passed:
                         new_trade_actions.append(ta)
-
-                print(f"[dedup] Actions passing filter: {len(new_trade_actions)}")
                 trade_actions = new_trade_actions
             else:
-                print("[dedup] No existing trade actions in DB for this strategy — using last backtest action only")
                 trade_actions = trade_actions[-1:]
 
             for ta in trade_actions:
@@ -360,7 +367,9 @@ async def _persist_backtest_result(
             logging.info("Saving trade actions to DB. Ticker: %s", ticker)
             if trade_actions:
                 saved_trade_actions = await trade_repo.insert_many(trade_actions)
-                print("Trade actions saved to DB.")
+                print(f"Trade actions saved to DB. Count: {len(saved_trade_actions)}")
+            else:
+                print("No new trade actions to save (all filtered by deduplication).")
         except Exception as e:
             logging.error("Failed to save trade actions: %s", e)
 
@@ -385,7 +394,10 @@ async def strategy_notification_job():
     for strategy in strategies:
         logging.info(
             "Updating strategy backtest. Ticker: %s, Strategy: %s, Period: %s, Interval: %s",
-            strategy.ticker, strategy.strategy, strategy.period, strategy.interval,
+            strategy.ticker,
+            strategy.strategy,
+            strategy.period,
+            strategy.interval,
         )
 
         # last_optimized_at is returned as a native datetime by psycopg3
