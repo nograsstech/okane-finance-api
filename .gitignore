@@ -1,12 +1,49 @@
-# Ignore all __pycache__ folders
+# Python
 **/__pycache__/
+*.py[cod]
 
-# Ignore data directory
-/data
+# Virtual environments
+.venv/
+venv/
 
-# Ignore .env files
+# Environment variables
 .env
 .env.*
 
-# Ignore virtual environment directory
-.venv/
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+
+# Linting
+.ruff_cache/
+
+# Chainlit
+.chainlit/
+.files/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# uv lock (committed intentionally — do not ignore)
+# uv.lock
+
+# Misc
+memory-bank/

@@ -1,0 +1,61 @@
+[UI]
+# Name of the app and chatbot.
+name = "Chatbot"
+
+# Description of the app and chatbot. This is used for HTML tags.
+# description = ""
+
+# Large size content are by default collapsed for a cleaner ui
+default_collapse_content = true
+
+# The default value for the expand messages settings.
+default_expand_messages = false
+
+# Chain of Thought (CoT) display mode. Can be "hidden", "tool_call" or "full".
+cot = "full"
+
+# Link to your github repo. This will add a github button in the UI's header.
+# github = ""
+
+# Specify a CSS file that can be used to customize the user interface.
+# The CSS file can be served from the public directory or via an external link.
+# custom_css = "/public/test.css"
+
+
+# Custom login page image, relative to public directory or external URL
+login_page_image = "/public/auth-background.jpg"
+
+# Custom login page image filter (Tailwind internal filters, no dark/light variants)
+login_page_image_filter = "brightness-50 grayscale"
+login_page_image_dark_filter = "contrast-200 blur-sm"
+
+# Path to your logo, relative to public directory or external URL
+logo = "/public/logo_light.png"
+# Path to your favicon, relative to public directory or external URL
+# favicon = "/public/favicon.ico"
+
+# Path to your dark mode logo, relative to public directory or external URL
+logo_dark = "/public/logo_dark.png"
+
+[UI.theme]
+  #layout = "wide"
+  #font_family = "Inter, sans-serif"
+  # Override default MUI light theme. (Check theme.ts)
+  [UI.theme.light]
+      #background = "#FAFAFA"
+      #paper = "#FFFFFF"
+
+      [UI.theme.light.primary]
+          #main = "#F80061"
+          #dark = "#980039"
+          #light = "#FFE7EB"
+
+  # Override default MUI dark theme. (Check theme.ts)
+  [UI.theme.dark]
+      #background = "#FAFAFA"
+      #paper = "#FFFFFF"
+
+      [UI.theme.dark.primary]
+          #main = "#F80061"
+          #dark = "#980039"
+          #light = "#FFE7EB"

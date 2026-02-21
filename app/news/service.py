@@ -5,6 +5,7 @@ import requests
 from app.base.utils.mongodb import connect_mongodb, COLLECTIONS
 from app.news.dto import AlphaVantageNewsQueryDTO
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
+import yfinance as yf
 
 """
 Mock response for AlphaVantage News and Sentiment API for testing purposes
@@ -33,10 +34,10 @@ async def fetch_alpha_vantage_news(_params: AlphaVantageNewsQueryDTO):
     params = {
         "function": "NEWS_SENTIMENT",
         "apikey": os.environ["ALPHA_VANTAGE_API_KEY"],
-        "from_date": _params.get('from_date'),
-        "to_date": _params.get('to_date'),
-        "tickers": _params.get('tickers'),
-        "limit": _params.get('limit'),
+        "from_date": _params.from_date,
+        "to_date": _params.to_date,
+        "tickers": _params.tickers,
+        "limit": _params.limit,
         "sort": "RELEVANCE",
     }
 
@@ -89,7 +90,7 @@ async def fetch_alpha_vantage_news(_params: AlphaVantageNewsQueryDTO):
 
 async def fetch_alpha_vantage_news_6h():
     # from is now - 6 hours, formatted as YYYYMMDDTHHmm
-    _date_utc = datetime.datetime.utcnow()
+    _date_utc = datetime.datetime.now(datetime.timezone.utc)
     _from_date = (_date_utc - datetime.timedelta(hours=6)
                   ).strftime("%Y%m%dT%H%M")
     _to_date = _date_utc.strftime("%Y%m%dT%H%M")
@@ -102,3 +103,84 @@ async def fetch_alpha_vantage_news_6h():
     }
     res = await fetch_alpha_vantage_news(_params)
     return res
+
+async def fetch_yfinance_news(ticker: str, limit: int = 10):
+    try:
+        news_result = yf.Search(ticker, news_count=limit).news
+        filtered_news = [
+            {key: value for key, value in news_item.items() if key not in ["thumbnail", "type", "uuid"]}
+            for news_item in news_result
+        ]
+        return {
+            "ticker": ticker,
+            "news": filtered_news,
+        }
+    except Exception as e:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": f"Failed to fetch news from yfinance. Error: {e}",
+        }
+
+
+async def get_news_sentiment_per_period_by_ticker(ticker: str):
+    db = await connect_mongodb()
+    collection = db[COLLECTIONS["news_with_sentiment"]]
+
+    intervals = {
+        "6 hours": {"hours": 6},
+        "1 day": {"days": 1},
+        "1 week": {"days": 7},
+        "1 month": {"days": 30},
+        "3 months": {"days": 90},
+    }
+
+    results = {}
+
+    for interval_name, interval_delta in intervals.items():
+        _date_utc = datetime.datetime.utcnow()
+        from_date = (_date_utc - datetime.timedelta(**interval_delta)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        print(from_date)
+        news_cursor = collection.find({
+            "ticker_sentiment": {
+                "$elemMatch": {
+                    "ticker": ticker
+                }
+            },
+            "time_published": {
+                "$gte": from_date,
+            }
+        })
+
+        sentiment_scores = [doc["overall_sentiment_score"] async for doc in news_cursor]
+        average_sentiment_score = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+        
+        results[interval_name] = {"timeframe": average_sentiment_score}
+    
+    weekly_sentiments = {}
+    for i in range(1, 11):
+        week_name = f"{i} week{'s' if i > 1 else ''} ago"
+        _date_utc = datetime.datetime.utcnow()
+        from_date = (_date_utc - datetime.timedelta(days=i * 7)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        to_date = (_date_utc - datetime.timedelta(days=(i - 1) * 7)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        news_cursor = collection.find({
+            "ticker_sentiment": {
+                "$elemMatch": {
+                    "ticker": ticker
+                }
+            },
+            "time_published": {
+                "$gte": from_date,
+                "$lt": to_date,
+            }
+        })
+        
+        sentiment_scores = [doc["overall_sentiment_score"] async for doc in news_cursor]
+        average_sentiment_score = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+        weekly_sentiments[week_name] = average_sentiment_score
+
+    results["weekly_sentiment"] = weekly_sentiments
+    results["ticker"] = ticker
+    print(results)
+    return results

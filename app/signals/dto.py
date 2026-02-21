@@ -1,11 +1,11 @@
 from pydantic import BaseModel, Field
-from typing import Any, Optional, Dict, Union, List
-
+from typing import Any, Literal, Optional, Dict, Union, List
+from app.signals.strategies.strategy_list import strategy_list
 class SignalRequestDTO(BaseModel):
     ticker: str = Field(...)
     period: Optional[str] = Field(None)
     interval: str = Field(...)
-    strategy: Optional[str] = Field(None)
+    strategy: Optional[Literal[tuple(strategy_list)]]  = Field(None, allowed_values=strategy_list) # type: ignore
     parameters: Optional[str] = Field(None)
     start: Optional[str] = Field(None)
     end: Optional[str]= Field(None)
