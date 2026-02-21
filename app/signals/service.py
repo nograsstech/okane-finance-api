@@ -311,9 +311,9 @@ async def _persist_backtest_result(
 
         # Determine which trade actions are "new" by querying against the correct backtest_stat ID
         if updated_stat is not None:
-            print(f"[dedup] Querying latest trade action for backtest_stat.id={updated_stat.id}")
+            # print(f"[dedup] Querying latest trade action for backtest_stat.id={updated_stat.id}")
             latest_ta = await trade_repo.get_latest_for_strategy(updated_stat.id)
-            print(f"[dedup] Total backtest trade actions before filter: {len(trade_actions)}")
+            # print(f"[dedup] Total backtest trade actions before filter: {len(trade_actions)}")
 
             if latest_ta is not None:
                 # Strip tzinfo from both sides so naive/aware mismatches never raise TypeError.
@@ -321,7 +321,7 @@ async def _persist_backtest_result(
                 cutoff_dt = latest_ta.datetime
                 if hasattr(cutoff_dt, "tzinfo") and cutoff_dt.tzinfo is not None:
                     cutoff_dt = cutoff_dt.replace(tzinfo=None)
-                print(f"[dedup] Cutoff datetime (latest DB trade action): {cutoff_dt!r}")
+                # print(f"[dedup] Cutoff datetime (latest DB trade action): {cutoff_dt!r}")
 
                 new_trade_actions = []
                 for ta in trade_actions:
@@ -332,19 +332,19 @@ async def _persist_backtest_result(
                         try:
                             ta_dt = datetime.strptime(raw_dt, "%Y-%m-%d %H:%M:%S")
                         except (ValueError, TypeError):
-                            logging.warning(
-                                "[dedup] Could not parse trade action datetime: %s — skipping", raw_dt
-                            )
+                            # logging.warning(
+                            #     "[dedup] Could not parse trade action datetime: %s — skipping", raw_dt
+                            # )
                             continue
                     passed = ta_dt > cutoff_dt
-                    print(f"[dedup]   ta_dt={ta_dt!r} > cutoff={cutoff_dt!r} → {passed}")
+                    # print(f"[dedup]   ta_dt={ta_dt!r} > cutoff={cutoff_dt!r} → {passed}")
                     if passed:
                         new_trade_actions.append(ta)
 
-                print(f"[dedup] Actions passing filter: {len(new_trade_actions)}")
+                # print(f"[dedup] Actions passing filter: {len(new_trade_actions)}")
                 trade_actions = new_trade_actions
             else:
-                print("[dedup] No existing trade actions in DB for this strategy — using last backtest action only")
+                # print("[dedup] No existing trade actions in DB for this strategy — using last backtest action only")
                 trade_actions = trade_actions[-1:]
 
             for ta in trade_actions:
