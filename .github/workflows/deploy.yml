@@ -24,6 +24,7 @@ jobs:
             cd ~/projects/okane/okane-finance-api
 
             # Pull latest code
+            git checkout main
             git pull origin main
 
             # Create backup

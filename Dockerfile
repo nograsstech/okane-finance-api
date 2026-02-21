@@ -50,8 +50,8 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 
 # Create necessary directories with correct ownership
-RUN mkdir -p /app/logs /app/cache && \
-    chown -R appuser:appuser /app/logs /app/cache
+RUN mkdir -p /app/logs /app/cache /app/.files && \
+    chown -R appuser:appuser /app/logs /app/cache /app/.files
 
 # Copy application code
 COPY --chown=appuser:appuser app ./app
