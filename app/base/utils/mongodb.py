@@ -1,9 +1,20 @@
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
+"""
+MongoDB client — module-level singleton using motor (async).
+
+Instead of creating a new client on every request (the old behaviour),
+this module creates a single AsyncIOMotorClient at import time and caches
+the resolved Database object.  Callers continue to use connect_mongodb()
+for backward compatibility; it now simply returns the cached Database.
+"""
+
+from __future__ import annotations
+
 import os
-from dotenv import load_dotenv
 import certifi
+from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.server_api import ServerApi
+
 load_dotenv()
 
 COLLECTIONS = {
@@ -14,20 +25,29 @@ COLLECTIONS = {
     "ticker_infos": "ticker_infos",
 }
 
+# ---------------------------------------------------------------------------
+# Singleton client — created once at module import time.
+# ---------------------------------------------------------------------------
+_MONGO_URI = (
+    f"mongodb+srv://{os.environ.get('MONGO_USER')}:{os.environ.get('MONGO_PASSWORD')}"
+    f"@develop.dkur4lg.mongodb.net/?retryWrites=true&w=majority"
+)
+
+_client: AsyncIOMotorClient = AsyncIOMotorClient(
+    _MONGO_URI,
+    server_api=ServerApi("1"),
+    tlsCAFile=certifi.where(),
+)
+
+_db_name: str = "production" if os.environ.get("ENV") == "production" else "develop"
+_database = _client[_db_name]
+
+
 async def connect_mongodb():
-  uri = f"mongodb+srv://{os.environ['MONGO_USER']}:{os.environ['MONGO_PASSWORD']}@develop.dkur4lg.mongodb.net/?retryWrites=true&w=majority"
+    """
+    Return the cached Motor database instance.
 
-  # Create a new client and connect to the server
-  # client = MongoClient(uri, server_api=ServerApi('1'))
-  client = AsyncIOMotorClient(uri, server_api=ServerApi('1'), tlsCAFile=certifi.where())
-
-  # Send a ping to confirm a successful connection
-  try:
-      client.admin.command('ping')
-      print("Pinged your deployment. You successfully connected to MongoDB!")
-  except Exception as e:
-      print(e)
-
-  if (os.environ['ENV'] == 'production'):
-    return client['production']
-  return client['develop']
+    Kept as an async function for full backward compatibility with all callers
+    that do ``db = await connect_mongodb()``.
+    """
+    return _database

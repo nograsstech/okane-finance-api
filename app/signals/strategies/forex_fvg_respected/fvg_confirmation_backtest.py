@@ -113,7 +113,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     margin = 1/500
     cash = 100000
 
-    QuantFVGStrategy.tp_sl_ratio = strategy_parameters.get('tp_sl_ratio', QuantFVGStrategy.tp_sl_ratio)
+    QuantFVGStrategy.tp_sl_ratio = strategy_parameters.get('tpslRatio', QuantFVGStrategy.tp_sl_ratio)
     QuantFVGStrategy.fvg_min_size_atr_multiplier = strategy_parameters.get('fvg_min_size_atr_multiplier', QuantFVGStrategy.fvg_min_size_atr_multiplier)
     QuantFVGStrategy.fvg_candle_range_atr_multiplier = strategy_parameters.get('fvg_candle_range_atr_multiplier', QuantFVGStrategy.fvg_candle_range_atr_multiplier)
     QuantFVGStrategy.sl_atr_multiplier = strategy_parameters.get('sl_atr_multiplier', QuantFVGStrategy.sl_atr_multiplier)
@@ -132,11 +132,11 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
         
         if stats is not None and '_strategy' in stats:
             best_params = {
-                'tp_sl_ratio': stats['_strategy'].tp_sl_ratio
+                'tpslRatio': stats['_strategy'].tp_sl_ratio
             }
         else:
             best_params = {
-                'tp_sl_ratio': QuantFVGStrategy.tp_sl_ratio
+                'tpslRatio': QuantFVGStrategy.tp_sl_ratio
             }
         print("Best params from optimization:", best_params)
 
@@ -144,10 +144,11 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
         print("Skipping optimization for FVG Confirmation Strategy.")
         if not best_params:
             best_params = {
-                'tp_sl_ratio': strategy_parameters.get('tp_sl_ratio', QuantFVGStrategy.tp_sl_ratio)
+                'tpslRatio': strategy_parameters.get('tpslRatio', QuantFVGStrategy.tp_sl_ratio)
             }
     
-    QuantFVGStrategy.tp_sl_ratio = best_params['tp_sl_ratio']
+    # Safely extract tp_sl_ratio; tolerate both keys just in case
+    QuantFVGStrategy.tp_sl_ratio = best_params.get('tpslRatio', best_params.get('tp_sl_ratio', QuantFVGStrategy.tp_sl_ratio))
     QuantFVGStrategy.log_trades = True
     QuantFVGStrategy.mysize = size
     
@@ -160,7 +161,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 
     strategy_parameters = {
         "best": True,
-        "tpslRatio": best_params['tp_sl_ratio']
+        "tpslRatio": QuantFVGStrategy.tp_sl_ratio
     }
     
     print("Final strategy parameters used:", strategy_parameters)
