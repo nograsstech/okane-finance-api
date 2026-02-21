@@ -117,7 +117,9 @@ okane-finance-api/
 │   ├── ticker/          # Ticker data endpoints
 │   ├── notification/    # Push notification service
 │   ├── auth/            # Authentication
+│   ├── db/              # SQLAlchemy database models & repositories
 │   └── base/            # Shared models & interfaces
+├── tests/               # Pytest suite
 ├── public/              # Static files
 ├── vendor/              # Local wheel packages (pandas_ta)
 ├── pyproject.toml       # ← single source of truth for deps

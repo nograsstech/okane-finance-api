@@ -1,0 +1,15 @@
+ app/base/utils/mongodb.py                          |  58 +-
+ app/db/__init__.py                                 |   1 +
+ app/db/models.py                                   | 152 +++++
+ app/db/postgres.py                                 | 114 ++++
+ app/db/repository.py                               | 104 ++++
+ app/notification/service.py                        |  20 +-
+ app/signals/router.py                              |  86 ++-
+ app/signals/service.py                             | 630 ++++++++++-----------
+ .../fvg_confirmation_backtest.py                   |  13 +-
+ pyproject.toml                                     |  15 +-
+ tests/__init__.py                                  |   1 +
+ tests/conftest.py                                  |  78 +++
+ tests/test_mongodb_client.py                       |  81 +++
+ tests/test_postgres_repository.py                  | 142 +++++
+ 14 files changed, 1065 insertions(+), 430 deletions(-)
