@@ -48,7 +48,7 @@ dependencies = [
 
     # ── Data Processing ───────────────────────────────────────────────────────
     "pandas>=2.2.0",
-    "numpy>=1.26.0,<2.0",  # pandas_ta vendor wheel uses numpy.NaN, removed in numpy 2.x
+    "numpy>=2.1.0",  # Python 3.13 requires numpy 2.x for prebuilt wheels
     "pandas-ta",  # vendor wheel — see [tool.uv.sources]
     "scipy>=1.14.0",
     "scikit-learn>=1.6.0",
