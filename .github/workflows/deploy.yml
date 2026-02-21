@@ -1,0 +1,50 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            cd ~/projects/okane/okane-finance-api
+
+            # Pull latest code
+            git pull origin main
+
+            # Create backup
+            mkdir -p backups
+            cp .env backups/.env.$(date +%Y%m%d_%H%M%S)
+
+            # Stop and remove existing containers
+            docker-compose down
+
+            # Rebuild and start
+            docker-compose build --no-cache
+            docker-compose up -d
+
+            # Wait for container to be healthy
+            sleep 30
+
+            # Health check
+            if curl -f http://localhost:8000/; then
+              echo "Deployment successful!"
+            else
+              echo "Health check failed, rolling back..."
+              docker-compose down
+              # Restore from backup if needed
+              exit 1
+            fi
