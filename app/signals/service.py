@@ -298,22 +298,7 @@ async def _persist_backtest_result(
         except Exception as e:
             logging.error("Failed to deflate HTML: %s", e)
 
-        # Compute the metrics-based flag and persist it to the DB record.
-        # NOTE: this does NOT override the `notifications_on` parameter that was
-        # passed into this function — that value (from strategy.notifications_on)
-        # is the authoritative source for whether to actually send a notification.
-        good_sharpe = backtest_stats_data["sharpe_ratio"] > 0
-        good_return = backtest_stats_data["return_percentage"] > 0
-        good_winrate = backtest_stats_data["win_rate"] > 60
-        computed_notifications_on = (good_sharpe and good_return) or good_winrate
-        backtest_stats_data["notifications_on"] = computed_notifications_on
-        print(
-            f"Notifications — strategy flag: {notifications_on}, "
-            f"computed flag: {computed_notifications_on} "
-            f"(sharpe>0={good_sharpe}, return>0={good_return}, winrate>60={good_winrate})"
-        )
-
-        # Upsert backtest_stats
+        # Upsert backtest_stats first to get the existing record (if any)
         updated_stat = None
         try:
             logging.info(
@@ -325,6 +310,40 @@ async def _persist_backtest_result(
             updated_stat = await backtest_repo.upsert(backtest_stats_data)
         except Exception as e:
             logging.error("Failed to save backtest stats: %s", e)
+
+        # Compute the metrics-based flag and persist it to the DB record.
+        # NOTE: this does NOT override the `notifications_on` parameter that was
+        # passed into this function — that value (from strategy.notifications_on)
+        # is the authoritative source for whether to actually send a notification.
+        # Only set notifications_on if the existing value is None (empty/initial).
+        good_sharpe = backtest_stats_data["sharpe_ratio"] > 0
+        good_return = backtest_stats_data["return_percentage"] > 0
+        good_winrate = backtest_stats_data["win_rate"] > 60
+        computed_notifications_on = (good_sharpe and good_return) or good_winrate
+
+        # Check if there's an existing record with a notifications_on value
+        existing_notifications_on = None
+        if updated_stat and updated_stat.notifications_on is not None:
+            existing_notifications_on = updated_stat.notifications_on
+
+        # Only set notifications_on if it was previously None (empty/initial)
+        if existing_notifications_on is None:
+            backtest_stats_data["notifications_on"] = computed_notifications_on
+            # Update the record again with the computed value
+            try:
+                updated_stat = await backtest_repo.upsert(backtest_stats_data)
+            except Exception as e:
+                logging.error("Failed to update notifications_on: %s", e)
+        else:
+            backtest_stats_data["notifications_on"] = existing_notifications_on
+
+        print(
+            f"Notifications — strategy flag: {notifications_on}, "
+            f"computed flag: {computed_notifications_on}, "
+            f"existing flag: {existing_notifications_on}, "
+            f"final flag: {backtest_stats_data['notifications_on']} "
+            f"(sharpe>0={good_sharpe}, return>0={good_return}, winrate>60={good_winrate})"
+        )
 
         # Determine which trade actions are "new" by querying against the correct backtest_stat ID
         if updated_stat is not None:
