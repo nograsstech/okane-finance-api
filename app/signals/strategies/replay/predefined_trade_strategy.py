@@ -71,7 +71,17 @@ def backtest(df, trade_schedule, cash=100000, margin=1/500):
 
     # Sort by datetime
     parsed_schedule.sort(key=lambda x: x['datetime'])
+
+    # Filter out trades that are older than the yfinance data range
+    # This prevents old trades from piling up on the first bar
+    df_start = dftest.index.min()
+    original_count = len(parsed_schedule)
+    parsed_schedule = [t for t in parsed_schedule if t['datetime'] >= df_start]
+    filtered_count = original_count - len(parsed_schedule)
+
     print(f"[REPLAY] Parsed {len(parsed_schedule)} trades")
+    if filtered_count > 0:
+        print(f"[REPLAY] Filtered out {filtered_count} trades older than yfinance data start ({df_start})")
     if parsed_schedule:
         print(f"[REPLAY] First trade: {parsed_schedule[0]['datetime']} (tz: {parsed_schedule[0]['datetime'].tz}) - {parsed_schedule[0]['trade_action']}")
         print(f"[REPLAY] Last trade: {parsed_schedule[-1]['datetime']} (tz: {parsed_schedule[-1]['datetime'].tz}) - {parsed_schedule[-1]['trade_action']}")
