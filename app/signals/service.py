@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import logging
+import math
 import os
 import warnings
 import zlib
@@ -31,6 +32,17 @@ from app.signals.utils.signals import get_all_signals, get_latest_signal
 from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
 
 executor = ThreadPoolExecutor(max_workers=5)
+
+
+def safe_float(value, default=0.0, decimals=3):
+    """Safely convert a value to float, handling NaN and None values."""
+    try:
+        float_val = float(value)
+        if math.isnan(float_val) or math.isinf(float_val):
+            return default
+        return round(float_val, decimals)
+    except (TypeError, ValueError):
+        return default
 
 
 async def get_signals(ticker, interval, period, strategy, parameters, start=None, end=None):
@@ -298,22 +310,7 @@ async def _persist_backtest_result(
         except Exception as e:
             logging.error("Failed to deflate HTML: %s", e)
 
-        # Compute the metrics-based flag and persist it to the DB record.
-        # NOTE: this does NOT override the `notifications_on` parameter that was
-        # passed into this function — that value (from strategy.notifications_on)
-        # is the authoritative source for whether to actually send a notification.
-        good_sharpe = backtest_stats_data["sharpe_ratio"] > 0
-        good_return = backtest_stats_data["return_percentage"] > 0
-        good_winrate = backtest_stats_data["win_rate"] > 60
-        computed_notifications_on = (good_sharpe and good_return) or good_winrate
-        backtest_stats_data["notifications_on"] = computed_notifications_on
-        print(
-            f"Notifications — strategy flag: {notifications_on}, "
-            f"computed flag: {computed_notifications_on} "
-            f"(sharpe>0={good_sharpe}, return>0={good_return}, winrate>60={good_winrate})"
-        )
-
-        # Upsert backtest_stats
+        # Upsert backtest_stats first to get the existing record (if any)
         updated_stat = None
         try:
             logging.info(
@@ -325,6 +322,40 @@ async def _persist_backtest_result(
             updated_stat = await backtest_repo.upsert(backtest_stats_data)
         except Exception as e:
             logging.error("Failed to save backtest stats: %s", e)
+
+        # Compute the metrics-based flag and persist it to the DB record.
+        # NOTE: this does NOT override the `notifications_on` parameter that was
+        # passed into this function — that value (from strategy.notifications_on)
+        # is the authoritative source for whether to actually send a notification.
+        # Only set notifications_on if the existing value is None (empty/initial).
+        good_sharpe = backtest_stats_data["sharpe_ratio"] > 0
+        good_return = backtest_stats_data["return_percentage"] > 0
+        good_winrate = backtest_stats_data["win_rate"] > 60
+        computed_notifications_on = (good_sharpe and good_return) or good_winrate
+
+        # Check if there's an existing record with a notifications_on value
+        existing_notifications_on = None
+        if updated_stat and updated_stat.notifications_on is not None:
+            existing_notifications_on = updated_stat.notifications_on
+
+        # Only set notifications_on if it was previously None (empty/initial)
+        if existing_notifications_on is None:
+            backtest_stats_data["notifications_on"] = computed_notifications_on
+            # Update the record again with the computed value
+            try:
+                updated_stat = await backtest_repo.upsert(backtest_stats_data)
+            except Exception as e:
+                logging.error("Failed to update notifications_on: %s", e)
+        else:
+            backtest_stats_data["notifications_on"] = existing_notifications_on
+
+        print(
+            f"Notifications — strategy flag: {notifications_on}, "
+            f"computed flag: {computed_notifications_on}, "
+            f"existing flag: {existing_notifications_on}, "
+            f"final flag: {backtest_stats_data['notifications_on']} "
+            f"(sharpe>0={good_sharpe}, return>0={good_return}, winrate>60={good_winrate})"
+        )
 
         # Determine which trade actions are "new" by querying against the correct backtest_stat ID
         if updated_stat is not None:
@@ -376,6 +407,182 @@ async def _persist_backtest_result(
     return {
         "notifications_on": notifications_on,
         "trade_actions": saved_trade_actions,
+    }
+
+
+async def replay_backtest(backtest_id: int):
+    """
+    Replay a backtest from stored TradeAction records.
+
+    Fetches historical data fresh from yfinance and applies the stored trades.
+    No caching - calculates on the fly.
+
+    Args:
+        backtest_id: The ID of the backtest to replay
+
+    Returns:
+        dict with status, message, and data (backtest stats + HTML)
+    """
+    print(f"\n--- REPLAY BACKTEST ---\n--- Backtest ID: {backtest_id} ---\n")
+
+    # Fetch backtest metadata and trade actions from DB
+    async with AsyncSessionLocal() as session:
+        backtest_repo = BacktestStatRepository(session)
+        trade_repo = TradeActionRepository(session)
+
+        # Get the BacktestStat
+        backtest_stat = await backtest_repo.get_by_id(backtest_id)
+        if backtest_stat is None:
+            print(f"[REPLAY] Backtest with ID {backtest_id} not found")
+            raise HTTPException(status_code=404, detail=f"Backtest with ID {backtest_id} not found")
+
+        print(
+            f"[REPLAY] Found backtest: {backtest_stat.ticker} {backtest_stat.strategy} {backtest_stat.interval}"
+        )
+
+        # Get all trade actions
+        trade_actions = await trade_repo.get_all_for_backtest(backtest_id)
+        if not trade_actions:
+            print(f"[REPLAY] No trade actions found for backtest ID {backtest_id}")
+            raise HTTPException(
+                status_code=404, detail=f"No trade actions found for backtest ID {backtest_id}"
+            )
+
+        print(f"[REPLAY] Found {len(trade_actions)} trade actions in database")
+
+        # Convert TradeAction ORM models to dicts for the strategy
+        trade_schedule = []
+        for ta in trade_actions:
+            trade_schedule.append(
+                {
+                    "datetime": ta.datetime.strftime("%Y-%m-%d %H:%M:%S.%f")
+                    if ta.datetime
+                    else None,
+                    "trade_action": ta.trade_action,
+                    "entry_price": ta.entry_price,
+                    "price": ta.price,
+                    "sl": ta.sl,
+                    "tp": ta.tp,
+                    "size": ta.size,
+                }
+            )
+
+    # Extract backtest parameters
+    ticker = backtest_stat.ticker
+    interval = backtest_stat.interval
+    period = backtest_stat.period
+    start_time = backtest_stat.start_time
+    end_time = backtest_stat.end_time
+
+    print(f"Replaying backtest for {ticker} from {start_time} to {end_time}")
+    print(f"Found {len(trade_schedule)} trade actions to replay")
+
+    # Validate required fields
+    if not all([ticker, interval, period]):
+        missing = []
+        if not ticker:
+            missing.append("ticker")
+        if not interval:
+            missing.append("interval")
+        if not period:
+            missing.append("period")
+        print(f"[REPLAY] Missing required fields: {missing}")
+        raise HTTPException(
+            status_code=400, detail=f"Backtest is missing required fields: {', '.join(missing)}"
+        )
+
+    # -----------------------------------------------------------------
+    # Run CPU-bound work in a thread (doesn't block the event loop)
+    # -----------------------------------------------------------------
+    def _run_replay():
+        """Sync work: fetch data + compute backtest replay."""
+        from app.signals.strategies.replay.predefined_trade_strategy import (
+            backtest as replay_backtest_func,
+        )
+
+        # Fetch fresh historical data from yfinance
+        print(f"[REPLAY] Fetching yfinance data for {ticker} {interval} {period}")
+        df = getYFinanceData(
+            ticker=ticker, interval=interval, period=period, start=start_time, end=end_time
+        )
+
+        if df is None or df.empty:
+            raise ValueError(f"No data returned from yfinance for {ticker}")
+
+        print(f"[REPLAY] Got yfinance data: shape={df.shape}")
+
+        # Run the replay backtest
+        return replay_backtest_func(df, trade_schedule)
+
+    try:
+        bt, stats, trade_actions, strategy_parameters = await asyncio.to_thread(_run_replay)
+        if bt is None or stats is None:
+            print("[REPLAY] Backtest returned None")
+            raise HTTPException(
+                status_code=400,
+                detail="Backtest replay returned no results.",
+            )
+        print(f"[REPLAY] Backtest completed successfully")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[REPLAY] Error during replay: {e}")
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Failed to replay backtest. Error: {e}")
+
+    # Generate the HTML plot (also sync/CPU-bound)
+    def _render_html():
+        bt.plot(open_browser=False, filename="backtest_replay.html")
+        with open("backtest_replay.html", "r", encoding="utf-8") as f:
+            content = f.read()
+        os.remove("backtest_replay.html")
+        print(f"[REPLAY] HTML content length: {len(content)} characters")
+        print(f"[REPLAY] HTML starts with: {content[:200]}")
+        print(f"[REPLAY] HTML ends with: {content[-200:]}")
+        return content
+
+    html_content = await asyncio.to_thread(_render_html)
+    logging.info("replay_backtest finished")
+
+    # Build response DTO following existing pattern
+    backtest_stats_data = {
+        "ticker": ticker,
+        "max_drawdown_percentage": safe_float(stats["Max. Drawdown [%]"]),
+        "start_time": stats["Start"].strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "end_time": stats["End"].strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "duration": str(stats["Duration"]),
+        "exposure_time_percentage": safe_float(stats["Exposure Time [%]"]),
+        "final_equity": safe_float(stats["Equity Final [$]"]),
+        "peak_equity": safe_float(stats["Equity Peak [$]"]),
+        "return_percentage": safe_float(stats["Return [%]"]),
+        "buy_and_hold_return": safe_float(stats["Buy & Hold Return [%]"]),
+        "return_annualized": safe_float(stats["Return (Ann.) [%]"]),
+        "volatility_annualized": safe_float(stats["Volatility (Ann.) [%]"]),
+        "sharpe_ratio": safe_float(stats["Sharpe Ratio"]),
+        "sortino_ratio": safe_float(stats["Sortino Ratio"]),
+        "calmar_ratio": safe_float(stats["Calmar Ratio"]),
+        "average_drawdown_percentage": safe_float(stats["Avg. Drawdown [%]"]),
+        "max_drawdown_duration": str(stats["Max. Drawdown Duration"]),
+        "average_drawdown_duration": str(stats["Avg. Drawdown Duration"]),
+        "trade_count": stats["# Trades"],
+        "win_rate": safe_float(stats["Win Rate [%]"]),
+        "best_trade": safe_float(stats["Best Trade [%]"]),
+        "worst_trade": safe_float(stats["Worst Trade [%]"]),
+        "avg_trade": safe_float(stats["Avg. Trade [%]"]),
+        "max_trade_duration": str(stats["Max. Trade Duration"]),
+        "average_trade_duration": str(stats["Avg. Trade Duration"]),
+        "profit_factor": safe_float(stats["Profit Factor"]),
+        "html": html_content,
+        "tpslRatio": 0.0,  # Not applicable for replay
+        "sl_coef": 0.0,  # Not applicable for replay
+    }
+
+    return {
+        "status": HTTP_200_OK,
+        "message": "Backtest replay results",
+        "data": backtest_stats_data,
     }
 
 
@@ -437,3 +644,34 @@ async def _get_all_strategies():
     """Fetch all unique strategies from Postgres via ORM."""
     async with AsyncSessionLocal() as session:
         return await UniqueStrategyRepository(session).get_all()
+
+
+async def get_strategies():
+    """
+    Get the list of available trading strategies.
+
+    Returns a list of strategies with their IDs, names, and optional descriptions.
+    The strategy names are derived from the strategy_list configuration.
+    """
+    from app.signals.strategies.strategy_list import strategy_list
+    from app.signals.dto import StrategyInfo
+
+    strategies = []
+    for strategy_id in strategy_list:
+        # Convert strategy_id to a display name (capitalize and replace underscores)
+        name = strategy_id.replace("_", " ").title()
+
+        # Create strategy info object
+        strategies.append(
+            StrategyInfo(
+                id=strategy_id,
+                name=name,
+                description=None,  # Can be extended later with descriptions
+            )
+        )
+
+    return {
+        "status": HTTP_200_OK,
+        "message": "Available strategies",
+        "data": strategies,
+    }

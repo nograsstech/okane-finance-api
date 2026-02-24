@@ -54,6 +54,12 @@ class BacktestStatRepository:
         await self._session.commit()
         return result.scalar_one_or_none()
 
+    async def get_by_id(self, backtest_id: int) -> BacktestStat | None:
+        """Return a BacktestStat by its ID."""
+        stmt = select(BacktestStat).where(BacktestStat.id == backtest_id)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
 
 # ---------------------------------------------------------------------------
 # TradeActionRepository
@@ -86,6 +92,18 @@ class TradeActionRepository:
         stmt = pg_insert(TradeAction).values(records).returning(TradeAction)
         result = await self._session.execute(stmt)
         await self._session.commit()
+        return list(result.scalars().all())
+
+    async def get_all_for_backtest(
+        self, backtest_id: int
+    ) -> list[TradeAction]:
+        """Return all TradeActions for a given backtest_id, ordered by datetime."""
+        stmt = (
+            select(TradeAction)
+            .where(TradeAction.backtest_id == backtest_id)
+            .order_by(TradeAction.datetime.asc())
+        )
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
 

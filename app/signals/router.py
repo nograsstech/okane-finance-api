@@ -1,6 +1,5 @@
-from typing import Annotated
-
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 from starlette.status import HTTP_200_OK
@@ -9,9 +8,12 @@ from app.auth.basic_auth import get_current_username
 from app.signals import service
 from app.signals.dto import (
     BacktestProcessResponseDTO,
+    BacktestReplayRequestDTO,
+    BacktestReplayResponseDTO,
     BacktestResponseDTO,
     SignalRequestDTO,
     SignalResponseDTO,
+    StrategyListResponseDTO,
 )
 
 router = APIRouter(
@@ -64,9 +66,7 @@ async def backtest(
     return str(backtest_process_uuid)
 
 
-@router.get(
-    "/backtest/sync", status_code=HTTP_200_OK, response_model=BacktestResponseDTO
-)
+@router.get("/backtest/sync", status_code=HTTP_200_OK, response_model=BacktestResponseDTO)
 async def backtest_sync(
     username: Annotated[str, Depends(get_current_username)],
     params: SignalRequestDTO = Depends(),
@@ -82,6 +82,27 @@ async def backtest_sync(
     )
 
 
+@router.get("/backtest/replay", status_code=HTTP_200_OK, response_model=BacktestReplayResponseDTO)
+async def replay_backtest_endpoint(
+    username: Annotated[str, Depends(get_current_username)],
+    params: BacktestReplayRequestDTO = Depends(),
+) -> BacktestReplayResponseDTO:
+    """
+    Replay a backtest from stored TradeAction records.
+
+    Fetches fresh historical price data from yfinance and applies the stored trades
+    to calculate backtest results. No caching - calculates on the fly.
+
+    Args:
+        backtest_id: The ID of the backtest to replay
+
+    Returns:
+        Full backtest stats and HTML report
+    """
+    return await service.replay_backtest(
+        backtest_id=params.backtest_id,
+    )
+
 
 @router.post("/strategy-notification-job", status_code=HTTP_200_OK)
 async def strategy_notification(
@@ -89,3 +110,16 @@ async def strategy_notification(
 ) -> None:
     await service.strategy_notification_job()
     return None
+
+
+@router.get("/strategies", status_code=HTTP_200_OK, response_model=StrategyListResponseDTO)
+async def get_strategies(
+    username: Annotated[str, Depends(get_current_username)],
+) -> StrategyListResponseDTO:
+    """
+    Get the list of available trading strategies.
+
+    Returns a list of all strategies that can be used for backtesting
+    and signal generation.
+    """
+    return await service.get_strategies()
