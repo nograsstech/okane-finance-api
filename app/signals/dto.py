@@ -1,16 +1,20 @@
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
-from typing import Any, Literal, Optional, Dict, Union, List
+
 from app.signals.strategies.strategy_list import strategy_list
+
+
 class SignalRequestDTO(BaseModel):
     ticker: str = Field(...)
-    period: Optional[str] = Field(None)
+    period: str | None = Field(None)
     interval: str = Field(...)
-    strategy: Optional[Literal[tuple(strategy_list)]]  = Field(None, allowed_values=strategy_list) # type: ignore
-    parameters: Optional[str] = Field(None)
-    start: Optional[str] = Field(None)
-    end: Optional[str]= Field(None)
-    strategy_id: Optional[str] = Field(None)
-    backtest_process_uuid: Optional[str] = Field(None)
+    strategy: Literal[tuple(strategy_list)] | None  = Field(None, allowed_values=strategy_list) # type: ignore
+    parameters: str | None = Field(None)
+    start: str | None = Field(None)
+    end: str | None= Field(None)
+    strategy_id: str | None = Field(None)
+    backtest_process_uuid: str | None = Field(None)
     
 class Signal(BaseModel):
     gmtTime: str = Field(...)
@@ -23,7 +27,7 @@ class Signal(BaseModel):
     
 class SignalsDict(BaseModel):
     latest_signal: Signal = Field(...)
-    all_signals: List[Signal] = Field(...)
+    all_signals: list[Signal] = Field(...)
     
 class SignalRequestData(BaseModel):
     ticker: str
@@ -87,5 +91,11 @@ class TradeAction(BaseModel):
     sl: float = Field(...)
     tp: float = Field(...)
     size: float = Field(...)
-    
-    
+
+class BacktestReplayRequestDTO(BaseModel):
+    backtest_id: int = Field(..., description="The ID of the backtest to replay")
+
+class BacktestReplayResponseDTO(BaseModel):
+    status: int = Field(...)
+    message: str = Field(...)
+    data: BacktestStats = Field(...)
