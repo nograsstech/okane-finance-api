@@ -434,20 +434,18 @@ async def replay_backtest(backtest_id: int):
         backtest_stat = await backtest_repo.get_by_id(backtest_id)
         if backtest_stat is None:
             print(f"[REPLAY] Backtest with ID {backtest_id} not found")
-            raise HTTPException(
-                status_code=404,
-                detail=f"Backtest with ID {backtest_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Backtest with ID {backtest_id} not found")
 
-        print(f"[REPLAY] Found backtest: {backtest_stat.ticker} {backtest_stat.strategy} {backtest_stat.interval}")
+        print(
+            f"[REPLAY] Found backtest: {backtest_stat.ticker} {backtest_stat.strategy} {backtest_stat.interval}"
+        )
 
         # Get all trade actions
         trade_actions = await trade_repo.get_all_for_backtest(backtest_id)
         if not trade_actions:
             print(f"[REPLAY] No trade actions found for backtest ID {backtest_id}")
             raise HTTPException(
-                status_code=404,
-                detail=f"No trade actions found for backtest ID {backtest_id}"
+                status_code=404, detail=f"No trade actions found for backtest ID {backtest_id}"
             )
 
         print(f"[REPLAY] Found {len(trade_actions)} trade actions in database")
@@ -455,15 +453,19 @@ async def replay_backtest(backtest_id: int):
         # Convert TradeAction ORM models to dicts for the strategy
         trade_schedule = []
         for ta in trade_actions:
-            trade_schedule.append({
-                "datetime": ta.datetime.strftime('%Y-%m-%d %H:%M:%S.%f') if ta.datetime else None,
-                "trade_action": ta.trade_action,
-                "entry_price": ta.entry_price,
-                "price": ta.price,
-                "sl": ta.sl,
-                "tp": ta.tp,
-                "size": ta.size,
-            })
+            trade_schedule.append(
+                {
+                    "datetime": ta.datetime.strftime("%Y-%m-%d %H:%M:%S.%f")
+                    if ta.datetime
+                    else None,
+                    "trade_action": ta.trade_action,
+                    "entry_price": ta.entry_price,
+                    "price": ta.price,
+                    "sl": ta.sl,
+                    "tp": ta.tp,
+                    "size": ta.size,
+                }
+            )
 
     # Extract backtest parameters
     ticker = backtest_stat.ticker
@@ -486,8 +488,7 @@ async def replay_backtest(backtest_id: int):
             missing.append("period")
         print(f"[REPLAY] Missing required fields: {missing}")
         raise HTTPException(
-            status_code=400,
-            detail=f"Backtest is missing required fields: {', '.join(missing)}"
+            status_code=400, detail=f"Backtest is missing required fields: {', '.join(missing)}"
         )
 
     # -----------------------------------------------------------------
@@ -502,11 +503,7 @@ async def replay_backtest(backtest_id: int):
         # Fetch fresh historical data from yfinance
         print(f"[REPLAY] Fetching yfinance data for {ticker} {interval} {period}")
         df = getYFinanceData(
-            ticker=ticker,
-            interval=interval,
-            period=period,
-            start=start_time,
-            end=end_time
+            ticker=ticker, interval=interval, period=period, start=start_time, end=end_time
         )
 
         if df is None or df.empty:
@@ -531,6 +528,7 @@ async def replay_backtest(backtest_id: int):
     except Exception as e:
         print(f"[REPLAY] Error during replay: {e}")
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Failed to replay backtest. Error: {e}")
 
@@ -578,7 +576,7 @@ async def replay_backtest(backtest_id: int):
         "profit_factor": safe_float(stats["Profit Factor"]),
         "html": html_content,
         "tpslRatio": 0.0,  # Not applicable for replay
-        "sl_coef": 0.0,    # Not applicable for replay
+        "sl_coef": 0.0,  # Not applicable for replay
     }
 
     return {
@@ -646,3 +644,34 @@ async def _get_all_strategies():
     """Fetch all unique strategies from Postgres via ORM."""
     async with AsyncSessionLocal() as session:
         return await UniqueStrategyRepository(session).get_all()
+
+
+async def get_strategies():
+    """
+    Get the list of available trading strategies.
+
+    Returns a list of strategies with their IDs, names, and optional descriptions.
+    The strategy names are derived from the strategy_list configuration.
+    """
+    from app.signals.strategies.strategy_list import strategy_list
+    from app.signals.dto import StrategyInfo
+
+    strategies = []
+    for strategy_id in strategy_list:
+        # Convert strategy_id to a display name (capitalize and replace underscores)
+        name = strategy_id.replace("_", " ").title()
+
+        # Create strategy info object
+        strategies.append(
+            StrategyInfo(
+                id=strategy_id,
+                name=name,
+                description=None,  # Can be extended later with descriptions
+            )
+        )
+
+    return {
+        "status": HTTP_200_OK,
+        "message": "Available strategies",
+        "data": strategies,
+    }

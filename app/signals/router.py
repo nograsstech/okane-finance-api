@@ -13,6 +13,7 @@ from app.signals.dto import (
     BacktestResponseDTO,
     SignalRequestDTO,
     SignalResponseDTO,
+    StrategyListResponseDTO,
 )
 
 router = APIRouter(
@@ -65,9 +66,7 @@ async def backtest(
     return str(backtest_process_uuid)
 
 
-@router.get(
-    "/backtest/sync", status_code=HTTP_200_OK, response_model=BacktestResponseDTO
-)
+@router.get("/backtest/sync", status_code=HTTP_200_OK, response_model=BacktestResponseDTO)
 async def backtest_sync(
     username: Annotated[str, Depends(get_current_username)],
     params: SignalRequestDTO = Depends(),
@@ -83,11 +82,7 @@ async def backtest_sync(
     )
 
 
-@router.get(
-    "/backtest/replay",
-    status_code=HTTP_200_OK,
-    response_model=BacktestReplayResponseDTO
-)
+@router.get("/backtest/replay", status_code=HTTP_200_OK, response_model=BacktestReplayResponseDTO)
 async def replay_backtest_endpoint(
     username: Annotated[str, Depends(get_current_username)],
     params: BacktestReplayRequestDTO = Depends(),
@@ -109,10 +104,22 @@ async def replay_backtest_endpoint(
     )
 
 
-
 @router.post("/strategy-notification-job", status_code=HTTP_200_OK)
 async def strategy_notification(
     username: Annotated[str, Depends(get_current_username)],
 ) -> None:
     await service.strategy_notification_job()
     return None
+
+
+@router.get("/strategies", status_code=HTTP_200_OK, response_model=StrategyListResponseDTO)
+async def get_strategies(
+    username: Annotated[str, Depends(get_current_username)],
+) -> StrategyListResponseDTO:
+    """
+    Get the list of available trading strategies.
+
+    Returns a list of all strategies that can be used for backtesting
+    and signal generation.
+    """
+    return await service.get_strategies()
