@@ -16,7 +16,8 @@ origins = [
     # Wildcard for any Vercel preview deployments with okane-signals
     "https://*okane-signals*.vercel.app",
     "https://*okane-signals*.pointmekins-projects.vercel.app",
-    
+    "https://okane-signals-web.vercel.app",
+    "https://okane-signals.dhanabordee.com",
     "http://localhost",
     "http://localhost:5173",
     "http://localhost:4173",
