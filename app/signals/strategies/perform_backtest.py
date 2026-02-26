@@ -7,6 +7,7 @@ from .clf_bollinger_rsi.eurjpy_bollinger_rsi_60m_backtest import backtest as eur
 from .grid_trading.grid_trading_backtest import backtest as grid_trading_backtest
 from .super_safe_strategy.super_safe_strategy_backtest import backtest as super_safe_strategy_backtest
 from .forex_fvg_respected.fvg_confirmation_backtest import backtest as fvg_confirmation_backtest
+from .swing_1.swing_backtest import backtest as swing_1_backtest
 from fastapi import HTTPException
 
 def perform_backtest(df, strategy, parameters, skip_optimization=False, best_params=None):
@@ -30,6 +31,8 @@ def perform_backtest(df, strategy, parameters, skip_optimization=False, best_par
             return super_safe_strategy_backtest(df, parameters, parameters['size'], skip_optimization, best_params)
         elif strategy == "fvg_confirmation":
             return fvg_confirmation_backtest(df, parameters, parameters['size'], skip_optimization, best_params)
+        elif strategy == "swing-1":
+            return swing_1_backtest(df, parameters, parameters.get('size', 0.03), skip_optimization, best_params)
         else:
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
@@ -59,5 +62,7 @@ async def perform_backtest_async(df, strategy, parameters):
         return super_safe_strategy_backtest(df, parameters, parameters['size'])
     elif strategy == "fvg_confirmation":
         return fvg_confirmation_backtest(df, parameters, parameters['size'])
+    elif strategy == "swing-1":
+        return swing_1_backtest(df, parameters, parameters.get('size', 0.03))
     else:
         raise HTTPException(status_code=404, detail="Not found")
