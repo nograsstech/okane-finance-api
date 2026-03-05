@@ -32,7 +32,7 @@ def perform_backtest(df, strategy, parameters, skip_optimization=False, best_par
         elif strategy == "fvg_confirmation":
             return fvg_confirmation_backtest(df, parameters, parameters['size'], skip_optimization, best_params)
         elif strategy == "swing-1":
-            return swing_1_backtest(df, parameters, parameters.get('size', 0.03), skip_optimization, best_params)
+            return swing_1_backtest(df, parameters, parameters['size'], skip_optimization, best_params)
         else:
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
@@ -63,6 +63,6 @@ async def perform_backtest_async(df, strategy, parameters):
     elif strategy == "fvg_confirmation":
         return fvg_confirmation_backtest(df, parameters, parameters['size'])
     elif strategy == "swing-1":
-        return swing_1_backtest(df, parameters, parameters.get('size', 0.03))
+        return swing_1_backtest(df, parameters, parameters['size'])
     else:
         raise HTTPException(status_code=404, detail="Not found")
