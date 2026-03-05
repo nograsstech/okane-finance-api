@@ -29,7 +29,6 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"^https://(.*\.vercel\.app|.*\.dhanabordee\.com|okane-signals\.dhanabordee\.com)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
