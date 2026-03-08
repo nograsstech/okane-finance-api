@@ -38,12 +38,13 @@ class DoubleCandleStrat(Strategy):
     - Stop Loss: Based on ATR * slcoef
     - Take Profit: Stop Loss * TPSLRatio
 
-    Position Sizing:
+    Position Sizing (conservative for real-world usage):
     - Dynamic based on ATR volatility percentage
-    - Lower volatility = larger position (up to 5%)
-    - Higher volatility = smaller position (down to 1%)
+    - Lower volatility = larger position (up to 2%)
+    - Higher volatility = smaller position (down to 0.5%)
+    - Base size: 1% of account
     """
-    base_size = 0.03
+    base_size = 0.01
     slcoef = 1.5
     TPSLRatio = 2.0
     trades_actions = []
@@ -110,7 +111,7 @@ class DoubleCandleStrat(Strategy):
                 })
 
 
-def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_params=None):
+def backtest(df, strategy_parameters, size=0.01, skip_optimization=False, best_params=None):
     """
     Run backtest for the double candle strategy.
 
