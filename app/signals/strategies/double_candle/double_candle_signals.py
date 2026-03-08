@@ -7,12 +7,12 @@ Sell Signal: Generated when 2 consecutive red candles appear
 Green candle: Close > Open
 Red candle: Close < Open
 
-Position sizing rules:
-- Base size: 0.03 (3% of account)
+Position sizing rules (conservative for real-world usage):
+- Base size: 0.01 (1% of account)
 - Dynamic sizing based on ATR volatility
 - Lower volatility = larger position (more confidence)
 - Higher volatility = smaller position (less risk)
-- Size range: 0.01 to 0.05
+- Size range: 0.005 to 0.02 (0.5% to 2% of account)
 """
 import pandas as pd
 import numpy as np
@@ -66,17 +66,18 @@ def double_candle_signals(df: pd.DataFrame, parameters: dict) -> pd.DataFrame:
     # Lower ATR % = larger position, Higher ATR % = smaller position
     signals_df['atr_pct'] = signals_df['volatility_atr'] / signals_df['Close']
 
-    # Dynamic position sizing
-    # Base size 0.03, adjusted by volatility
-    # ATR% < 1%: increase size (low volatility = more confidence)
-    # ATR% > 2%: decrease size (high volatility = less risk)
+    # Dynamic position sizing (conservative for real-world usage)
+    # Base size 0.01 (1%), adjusted by volatility
+    # ATR% < 0.5%: increase size slightly (low volatility = more confidence)
+    # ATR% > 1.5%: decrease size (high volatility = less risk)
+    # Size range: 0.005 (0.5%) to 0.02 (2%)
     def calculate_position_size(atr_pct):
-        if atr_pct < 0.01:
-            return min(0.05, 0.03 + (0.01 - atr_pct) * 2)  # Max 0.05
-        elif atr_pct > 0.02:
-            return max(0.01, 0.03 - (atr_pct - 0.02) * 1)  # Min 0.01
+        if atr_pct < 0.005:  # Very low volatility
+            return min(0.02, 0.01 + (0.005 - atr_pct) * 2)  # Max 0.02 (2%)
+        elif atr_pct > 0.015:  # High volatility
+            return max(0.005, 0.01 - (atr_pct - 0.015) * 0.5)  # Min 0.005 (0.5%)
         else:
-            return 0.03  # Base size
+            return 0.01  # Base size (1%)
 
     signals_df['position_size'] = signals_df['atr_pct'].apply(calculate_position_size)
 
