@@ -163,11 +163,35 @@ async def get_backtest_result(
 
     # Generate the HTML plot (also sync/CPU-bound)
     def _render_html():
-        bt.plot(open_browser=False, filename="backtest.html")
-        with open("backtest.html") as f:
-            content = f.read()
-        os.remove("backtest.html")
-        return content
+        try:
+            # Try plotting without superimposition to avoid upsampling issues
+            bt.plot(open_browser=False, filename="backtest.html", superimpose=False)
+            with open("backtest.html") as f:
+                content = f.read()
+            os.remove("backtest.html")
+            return content
+        except Exception as e:
+            logging.warning(f"Plot generation failed: {e}. Falling back to basic plot.")
+            try:
+                # Fallback: try basic plot
+                bt.plot(open_browser=False, filename="backtest.html")
+                with open("backtest.html") as f:
+                    content = f.read()
+                os.remove("backtest.html")
+                return content
+            except Exception as e2:
+                logging.error(f"Basic plot also failed: {e2}. Generating minimal HTML.")
+                # Final fallback: return minimal HTML with just stats
+                return f"""
+                <html>
+                <head><title>Backtest Results</title></head>
+                <body>
+                    <h1>Backtest Results</h1>
+                    <pre>{stats}</pre>
+                    <p>Plot generation failed: {str(e2)}</p>
+                </body>
+                </html>
+                """
 
     html_content = await asyncio.to_thread(_render_html)
     logging.info("get_backtest_result finished")
