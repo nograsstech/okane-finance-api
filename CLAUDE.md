@@ -122,6 +122,17 @@ strategies/
     └── <strategy_name>_backtest.py # Backtest configuration
 ```
 
+**Available Strategies** (from `strategy_list.py`):
+1. **ema_bollinger** - EMA + Bollinger Bands crossover
+2. **ema_bollinger_1_low_risk** - Lower risk EMA Bollinger variant
+3. **macd_1** - MACD-based signals
+4. **clf_bollinger_rsi** - Classifier with Bollinger + RSI (15m interval)
+5. **clf_bollinger_rsi_15m** - 15-minute version
+6. **eurjpy_bollinger_rsi_60m** - EUR/JPY specific, 60-minute
+7. **grid_trading** - Grid trading strategy
+8. **super_safe_strategy** - Conservative approach
+9. **fvg_confirmation** - Fair Value Gap confirmation
+
 **To add a new strategy:**
 1. Create a new directory under `strategies/`
 2. Implement the strategy class inheriting from `backtesting.Strategy`
@@ -157,6 +168,8 @@ Required in `.env`:
 | `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID` | Discord bot integration |
 | `DISCORD_WEBHOOK_URL` | Discord push notifications |
 | `LINE_SECRET` | LINE messaging |
+| `OKANE_FINANCE_API_USER`, `OKANE_FINANCE_API_PASSWORD` | HTTP Basic auth |
+| `SUPABASE_URL`, `SUPABASE_KEY` | Supabase client |
 | `ENV` | `development` or `production` (switches MongoDB DB name) |
 
 ## Important Implementation Notes
@@ -187,3 +200,119 @@ Frontend is deployed to Vercel. CORS origins in `app/main.py` include:
 - `https://okane-signals.vercel.app`
 - Wildcards for preview deployments: `https://*okane-signals*.vercel.app`
 - Local: `http://localhost:5173`, `http://localhost:4173`
+
+## API Endpoints Reference
+
+All endpoints require **HTTP Basic Authentication** (via `get_current_username` dependency).
+
+### Root
+- `GET /` - Health check, returns `{"status": 200, "message": "Monii 0.1.0"}`
+
+### Signals (`/signals`)
+- `GET /signals` - Get trading signals for a ticker/strategy
+- `GET /signals/backtest` - Queue async backtest (returns UUID)
+- `GET /signals/backtest/sync` - Run backtest synchronously
+- `POST /signals/strategy-notification-job` - Trigger strategy notification job
+
+### AI (`/ai`)
+- `GET /ai/graph` - Get LangGraph visualization (PNG)
+- `POST /ai/chatbot-with-tool` - Stream chatbot responses (SSE)
+- `GET /ai/chat?thread_id=xxx` - Get chat history
+
+### News (`/news`)
+- News sentiment and feed endpoints
+
+### Ticker (`/ticker`)
+- Ticker data and historical price endpoints
+
+### Notification (`/notification`)
+- Webhook and notification management
+
+### Chainlit Chat UI
+- `/chat` - Mounted Chainlit interface
+
+## Tech Stack Reference
+
+### Core
+- **Python 3.13+** (uses uv for dependency management)
+- **FastAPI** - High-performance async web framework
+- **Pydantic v2** - Data validation and settings management
+- **Uvicorn** - ASGI server
+
+### Data & Financial
+- **yfinance** - Yahoo Finance data
+- **pandas-ta** - Technical analysis (vendor wheel patched for numpy 2.x)
+- **backtesting.py** - Strategy backtesting
+- **pandas/numpy** - Data processing
+
+### AI/LLM
+- **LangChain/LangGraph** - AI framework and conversation management
+- **Google Generative AI (Gemini)** - LLM for chatbot
+- **OpenAI SDK** - Additional AI capabilities
+- **Anthropic SDK** - Alternative AI provider
+
+### Database
+- **PostgreSQL (via Supabase)** - Primary database for backtest stats and trade actions
+- **MongoDB (motor)** - Async MongoDB for flexible schema data
+- **SQLAlchemy 2.x** - ORM with async support via psycopg[async]
+
+### Observability
+- **OpenTelemetry** - Distributed tracing
+- **Traceloop SDK** - LLM observability
+- **PostHog** - Analytics
+- **Loguru** - Structured logging
+
+### Deployment
+- **Docker** - 2-stage production builds
+- **docker-compose** - Local orchestration
+- **GitHub Actions** - VPS deployment pipeline
+
+## Database Schema Reference
+
+### PostgreSQL (Supabase)
+
+#### `backtest_stats`
+Core table storing backtest results:
+- Identifiers: `ticker`, `strategy`, `period`, `interval`, `ref_id`
+- Performance metrics: `return_percentage`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`
+- Drawdown stats: `max_drawdown_percentage`, `max_drawdown_duration`
+- Trade stats: `trade_count`, `win_rate`, `profit_factor`, `exposure_time_percentage`
+- Strategy params: `tpsl_ratio`, `sl_coef`, `tp_coef`
+- HTML: `html` (deflated + base64 encoded backtest plot)
+- Timestamps: `updated_at`, `last_optimized_at`
+
+#### `trade_actions`
+Individual trades from backtests:
+- Foreign key: `backtest_id` → `backtest_stats.id`
+- Trade details: `datetime`, `trade_action`, `entry_price`, `price`, `sl`, `tp`, `size`
+
+#### `unique_strategies`
+View/table of active strategy configurations with notifications enabled
+
+### MongoDB
+Collections: `stock_lists`, `news`, `news_with_sentiment`, `price_histories`, `ticker_infos`
+
+## Troubleshooting
+
+### MongoDB Connection Issues
+Check `MONGO_USER` and `MONGO_PASSWORD` in `.env`. Verify network connectivity.
+
+### pandas-ta Import Errors
+Ensure vendor wheel is present: `vendor/pandas_ta-0.3.14b0-py3-none-any.whl`
+Run `uv sync` to reinstall.
+
+### Backtest HTML Not Displaying
+HTML is deflated + base64 encoded. Use decompression utilities in `app/lib/utils/pako.py`.
+
+### Discord Bot Not Responding
+Verify `DISCORD_BOT_TOKEN` and `DISCORD_CHANNEL_ID`. Check bot has necessary permissions.
+
+## Memory Bank
+
+Additional project documentation is stored in `memory-bank/`:
+- `projectbrief.md` - Project goals and requirements
+- `techContext.md` - Technology choices and constraints
+- `systemPatterns.md` - Architecture and design patterns
+- `productContext.md` - Vision and user stories
+- `progress.md` - Development progress tracking
+- `activeContext.md` - Current work context
