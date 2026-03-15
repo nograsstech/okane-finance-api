@@ -9,6 +9,7 @@ from .super_safe_strategy.super_safe_strategy import super_safe_strategy_signals
 from .forex_fvg_respected.fvg_confirmation import fvg_confirmation_signals
 from .swing_1.swing_signals import swing_1_signals
 from .double_candle.double_candle_signals import double_candle_signals
+from .mean_reversion_trend_filter.mean_reversion_trend_filter import mean_reversion_trend_filter_signals
 
 def calculate_signals(df, df1d, strategy, parameters):
     print(strategy, parameters)
@@ -35,11 +36,15 @@ def calculate_signals(df, df1d, strategy, parameters):
         return swing_1_signals(df, parameters)
       elif strategy == "double_candle":
         return double_candle_signals(df, parameters)
+      elif strategy == "mean_reversion_trend_filter":
+        return mean_reversion_trend_filter_signals(df, df1d, parameters)
       else:
           return None
     except Exception as e:
         print("calculate_signals : ERROR__________________")
         print(e)
+        import traceback
+        traceback.print_exc()
         return None
       
       
@@ -67,5 +72,7 @@ async def calculate_signals_async(df, df1d, strategy, parameters):
       return swing_1_signals(df, parameters)
   elif strategy == "double_candle":
       return double_candle_signals(df, parameters)
+  elif strategy == "mean_reversion_trend_filter":
+      return mean_reversion_trend_filter_signals(df, df1d, parameters)
   else:
       return None

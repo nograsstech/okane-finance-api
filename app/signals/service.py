@@ -128,7 +128,15 @@ async def get_backtest_result(
     def _run_backtest():
         """Sync work: fetch data + compute backtest. Returns (bt, stats, trade_actions, strategy_parameters)."""
         df = getYFinanceData(ticker, interval, period, start, end)
-        df1d = getYFinanceData(ticker, "1d", period, start, end) if strategy == "macd_1" else None
+
+        # Fetch higher timeframe data for strategies that need it
+        if strategy == "macd_1":
+            df1d = getYFinanceData(ticker, "1d", period, start, end)
+        elif strategy == "mean_reversion_trend_filter":
+            # 4H data for trend filter
+            df1d = getYFinanceData(ticker, "4h", period, start, end)
+        else:
+            df1d = None
 
         signals_df = calculate_signals(df, df1d, strategy, parameters_dict)
 

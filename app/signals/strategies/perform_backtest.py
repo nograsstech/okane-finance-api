@@ -9,6 +9,7 @@ from .super_safe_strategy.super_safe_strategy_backtest import backtest as super_
 from .forex_fvg_respected.fvg_confirmation_backtest import backtest as fvg_confirmation_backtest
 from .swing_1.swing_backtest import backtest as swing_1_backtest
 from .double_candle.double_candle_backtest import backtest as double_candle_backtest
+from .mean_reversion_trend_filter.mean_reversion_trend_filter_backtest import backtest as mean_reversion_trend_filter_backtest
 from fastapi import HTTPException
 
 def perform_backtest(df, strategy, parameters, skip_optimization=False, best_params=None):
@@ -36,6 +37,8 @@ def perform_backtest(df, strategy, parameters, skip_optimization=False, best_par
             return swing_1_backtest(df, parameters, parameters['size'], skip_optimization, best_params)
         elif strategy == "double_candle":
             return double_candle_backtest(df, parameters, parameters.get('size', 0.01), skip_optimization, best_params)
+        elif strategy == "mean_reversion_trend_filter":
+            return mean_reversion_trend_filter_backtest(df, parameters, parameters.get('size', 0.01), skip_optimization, best_params)
         else:
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
@@ -69,5 +72,7 @@ async def perform_backtest_async(df, strategy, parameters):
         return swing_1_backtest(df, parameters, parameters['size'])
     elif strategy == "double_candle":
         return double_candle_backtest(df, parameters, parameters.get('size', 0.01))
+    elif strategy == "mean_reversion_trend_filter":
+        return mean_reversion_trend_filter_backtest(df, parameters, parameters.get('size', 0.01))
     else:
         raise HTTPException(status_code=404, detail="Not found")
