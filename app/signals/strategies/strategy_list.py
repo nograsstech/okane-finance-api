@@ -17,5 +17,6 @@ strategy_list = [
     "super_safe_strategy",
     "fvg_confirmation",
     "swing-1",
-    "double_candle"
+    "double_candle",
+    "mean_reversion_trend_filter"
 ]
