@@ -42,10 +42,10 @@ def OR_SIZE_PIPS():
 
 def PIP_VALUE():
     """Return the pip value for the instrument."""
-    pip_val = getattr(_dftest.Pip_Value, 'iloc', None)
-    if pip_val is not None:
-        return pip_val.iloc[0]
-    return _dftest.Pip_Value.iloc[0]
+    # Pip_Value is a scalar or series - access first element if series
+    if hasattr(_dftest.Pip_Value, 'iloc'):
+        return _dftest.Pip_Value.iloc[0]
+    return _dftest.Pip_Value
 
 
 class FiveMinORBStrat(Strategy):
