@@ -5,9 +5,9 @@ Shared utilities for 5-minute Opening Range Breakout strategies.
 Provides timezone conversion, session detection, and OR calculation functions.
 """
 
-from datetime import datetime, time, UTC
+from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
-from typing import Optional
+from typing import Optional, Tuple
 
 import pandas as pd
 
@@ -58,10 +58,10 @@ MIN_OR_SIZE_PIPS = 5
 
 def convert_utc_to_session_time(utc_time: datetime, session: str) -> datetime:
     """
-    Convert UTC time to session local time with DST handling.
+    Convert timezone.utc time to session local time with DST handling.
 
     Args:
-        utc_time: UTC datetime with timezone info
+        utc_time: timezone.utc datetime with timezone info
         session: 'london' or 'ny'
 
     Returns:
@@ -77,7 +77,7 @@ def convert_utc_to_session_time(utc_time: datetime, session: str) -> datetime:
     return utc_time.astimezone(tz).replace(tzinfo=None)
 
 
-def detect_session_window(utc_time: datetime, session: str) -> str | None:
+def detect_session_window(utc_time: datetime, session: str) -> Optional[str]:
     """
     Detect if the given time is within the active trading window.
 
@@ -87,7 +87,7 @@ def detect_session_window(utc_time: datetime, session: str) -> str | None:
         None if outside active window
 
     Args:
-        utc_time: UTC datetime with timezone info
+        utc_time: timezone.utc datetime with timezone info
         session: 'london' or 'ny'
 
     Raises:
@@ -150,7 +150,7 @@ def calculate_or_size_pips(or_high: float, or_low: float, pip_value: float) -> f
     return range_size / pip_value
 
 
-def get_or_threshold(ticker: str, session: str) -> int | None:
+def get_or_threshold(ticker: str, session: str) -> Optional[int]:
     """
     Get maximum OR size threshold for a ticker and session.
 
@@ -170,7 +170,7 @@ def get_or_threshold(ticker: str, session: str) -> int | None:
     return None
 
 
-def should_skip_session(or_size_pips: float, ticker: str, session: str) -> tuple[bool, str | None]:
+def should_skip_session(or_size_pips: float, ticker: str, session: str) -> Optional[Tuple[bool, Optional[str]]]:
     """
     Determine if a session should be skipped based on OR size.
 
@@ -213,7 +213,7 @@ def identify_opening_range(
     For example, if London opens at 08:00, the OR is the 08:00-08:05 candle.
 
     Args:
-        df: DataFrame with OHLC data, indexed by UTC timestamps
+        df: DataFrame with OHLC data, indexed by timezone.utc timestamps
         ticker: Ticker symbol (e.g., 'EUR/USD' or 'EURUSD')
         session: 'london' or 'ny'
         date_str: Date string in 'YYYY-MM-DD' format
@@ -224,7 +224,7 @@ def identify_opening_range(
             'or_high': float,           # High price of the OR
             'or_low': float,            # Low price of the OR
             'or_size_pips': float,      # OR size in pips
-            'or_time_index': pd.Timestamp,  # Timestamp of the OR candle (UTC)
+            'or_time_index': pd.Timestamp,  # Timestamp of the OR candle (timezone.utc)
             'skip': bool,               # True if session should be skipped
             'skip_reason': str | None   # Reason for skipping, or None
         }
@@ -242,21 +242,21 @@ def identify_opening_range(
     # Ensure DataFrame index is timezone-aware
     if df.index.tz is None:
         df = df.copy()
-        df.index = df.index.tz_localize(UTC)
-    elif df.index.tz != UTC:
+        df.index = df.index.tz_localize(timezone.utc)
+    elif df.index.tz != timezone.utc:
         df = df.copy()
-        df.index = df.index.tz_convert(UTC)
+        df.index = df.index.tz_convert(timezone.utc)
 
-    # Filter to the target date (in UTC)
-    target_date_start = datetime.combine(target_date, time.min).replace(tzinfo=UTC)
-    target_date_end = datetime.combine(target_date, time.max).replace(tzinfo=UTC)
+    # Filter to the target date (in timezone.utc)
+    target_date_start = datetime.combine(target_date, time.min).replace(tzinfo=timezone.utc)
+    target_date_end = datetime.combine(target_date, time.max).replace(tzinfo=timezone.utc)
 
     df_day = df[(df.index >= target_date_start) & (df.index <= target_date_end)]
 
     if df_day.empty:
         return None
 
-    # Get session open time in UTC for this date
+    # Get session open time in timezone.utc for this date
     # The session open time varies by DST, so we need to calculate it
     session_open_local = SESSION_WINDOWS[session]["open_time"]
 

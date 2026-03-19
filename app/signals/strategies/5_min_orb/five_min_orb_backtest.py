@@ -82,11 +82,17 @@ class FiveMinORBStrat(Strategy):
             return
 
         # Entry conditions
+        current_price = self.data.Close[-1]
+
         if self.signal1 == 2 and len(self.trades) == 0:
             # Long entry
             sl_price = or_low - (self.spread_buffer_pips * pip_value)
             tp1_price = or_high + (or_size_pips * pip_value * self.tp1_multiplier)
             tp2_price = or_high + (or_size_pips * pip_value * self.tp2_multiplier)
+
+            # Validate: SL < entry < TP (skip if price already past TP)
+            if sl_price >= current_price or tp1_price <= current_price:
+                return
 
             # Enter with 50% position at each TP level
             size1 = self.mysize * 0.5
@@ -95,15 +101,16 @@ class FiveMinORBStrat(Strategy):
             # Enter first half with TP1
             self.buy(sl=sl_price, tp=tp1_price, size=size1)
 
-            # Enter second half with TP2
-            self.buy(sl=sl_price, tp=tp2_price, size=size2)
+            # Enter second half with TP2 (only if TP2 is also valid)
+            if tp2_price > current_price:
+                self.buy(sl=sl_price, tp=tp2_price, size=size2)
 
             if _strategy_parameters and _strategy_parameters.get('best', False):
                 self.trades_actions.append({
                     "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
                     "trade_action": "buy",
-                    "entry_price": self.data.Close[-1],
-                    "price": self.data.Close[-1],
+                    "entry_price": current_price,
+                    "price": current_price,
                     "sl": sl_price,
                     "tp": f"TP1: {tp1_price}, TP2: {tp2_price}",
                     "size": self.mysize,
@@ -115,6 +122,10 @@ class FiveMinORBStrat(Strategy):
             tp1_price = or_low - (or_size_pips * pip_value * self.tp1_multiplier)
             tp2_price = or_low - (or_size_pips * pip_value * self.tp2_multiplier)
 
+            # Validate: TP < entry < SL (skip if price already past TP)
+            if sl_price <= current_price or tp1_price >= current_price:
+                return
+
             # Enter with 50% position at each TP level
             size1 = self.mysize * 0.5
             size2 = self.mysize * 0.5
@@ -122,15 +133,16 @@ class FiveMinORBStrat(Strategy):
             # Enter first half with TP1
             self.sell(sl=sl_price, tp=tp1_price, size=size1)
 
-            # Enter second half with TP2
-            self.sell(sl=sl_price, tp=tp2_price, size=size2)
+            # Enter second half with TP2 (only if TP2 is also valid)
+            if tp2_price < current_price:
+                self.sell(sl=sl_price, tp=tp2_price, size=size2)
 
             if _strategy_parameters and _strategy_parameters.get('best', False):
                 self.trades_actions.append({
                     "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
                     "trade_action": "sell",
-                    "entry_price": self.data.Close[-1],
-                    "price": self.data.Close[-1],
+                    "entry_price": current_price,
+                    "price": current_price,
                     "sl": sl_price,
                     "tp": f"TP1: {tp1_price}, TP2: {tp2_price}",
                     "size": self.mysize,
@@ -155,12 +167,17 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     Returns:
         Tuple of (backtest_object, stats, trades_actions, strategy_parameters)
     """
+    import time as _time
     global _dftest, _strategy_parameters
+
+    t_start = _time.time()
 
     # Validate input data
     if df is None or df.empty:
         print("five_min_orb backtest: df is None or empty")
         return None, None, [], {}
+
+    print(f"[ORB backtest] DataFrame rows: {len(df)}, signals: {(df.get('TotalSignal', 0) != 0).sum()}")
 
     dftest = df.copy()
     _dftest = dftest
@@ -178,46 +195,14 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     FiveMinORBStrat.tp2_multiplier = _strategy_parameters.get("tp2_multiplier", 2.0)
     FiveMinORBStrat.trades_actions = []
 
-    # Do optimization if skip_optimization is False
-    if not skip_optimization:
-        print("Optimizing five_min_orb...")
-        bt = Backtest(dftest, FiveMinORBStrat, cash=cash, margin=margin, finalize_trades=True)
-
-        stats, heatmap = bt.optimize(
-            spread_buffer_pips=[i for i in range(1, 6)],
-            tp1_multiplier=[i / 10 for i in range(5, 15, 2)],
-            tp2_multiplier=[i / 10 for i in range(15, 25, 2)],
-            maximize="Win Rate [%]",
-            max_tries=200,
-            random_state=0,
-            return_heatmap=True,
-        )
-
-        # Convert multiindex series to dataframe
-        heatmap_df = heatmap.unstack()
-
-        # Find the maximum value over the entire DataFrame
-        max_value = heatmap_df.max().max()
-
-        # Find the index of the maximum value
-        optimized_params = (heatmap_df == max_value).stack().idxmax()
-
+    # Skip optimization — use provided best_params or defaults
+    if best_params is None:
         best_params = {
-            'spread_buffer_pips': optimized_params[0],
-            'tp1_multiplier': optimized_params[1],
-            'tp2_multiplier': optimized_params[2]
+            'spread_buffer_pips': 2,
+            'tp1_multiplier': 1.0,
+            'tp2_multiplier': 2.0
         }
-
-        print(best_params)
-    else:
-        # Use provided best_params or defaults
-        if best_params is None:
-            best_params = {
-                'spread_buffer_pips': 2,
-                'tp1_multiplier': 1.0,
-                'tp2_multiplier': 2.0
-            }
-        print("Optimization is skipped, using params:", best_params)
+    print("[ORB backtest] Using params:", best_params)
 
     strategy_parameters = {
         "best": True,
@@ -235,8 +220,12 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     # Update the global _strategy_parameters with the final values
     _strategy_parameters = strategy_parameters
 
+    t_final = _time.time()
+    print("[ORB backtest] Running final backtest with best params...")
     bt_best = Backtest(dftest, FiveMinORBStrat, cash=cash, margin=margin, finalize_trades=True)
     stats = bt_best.run()
     trades_actions = bt_best._strategy.trades_actions
+    print(f"[ORB backtest] Final run done in {_time.time() - t_final:.1f}s — trades: {stats['# Trades']}, actions: {len(trades_actions)}")
+    print(f"[ORB backtest] Total backtest time: {_time.time() - t_start:.1f}s")
 
     return bt_best, stats, trades_actions, strategy_parameters
