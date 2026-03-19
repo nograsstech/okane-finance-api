@@ -11,6 +11,14 @@ from .swing_1.swing_signals import swing_1_signals
 from .double_candle.double_candle_signals import double_candle_signals
 from .mean_reversion_trend_filter.mean_reversion_trend_filter_signals import mean_reversion_trend_filter_signals
 
+# Import ORB signal functions using importlib (package names start with numbers)
+import importlib
+_five_min_orb_signals = importlib.import_module("app.signals.strategies.5_min_orb.five_min_orb_signals")
+five_min_orb_signals = _five_min_orb_signals.five_min_orb_signals
+# TODO: Uncomment when 5_min_orb_confirmation module is implemented
+# _five_min_orb_confirmation_signals = importlib.import_module("app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_signals")
+# five_min_orb_confirmation_signals = _five_min_orb_confirmation_signals.five_min_orb_confirmation_signals
+
 def calculate_signals(df, df1d, strategy, parameters):
     print(strategy, parameters)
     try:
@@ -42,6 +50,11 @@ def calculate_signals(df, df1d, strategy, parameters):
         params = parameters or {}
         df_4h = params.get('df_4h', df1d)
         return mean_reversion_trend_filter_signals(df, df_4h, params)
+      elif strategy == "5_min_orb":
+          return five_min_orb_signals(df, parameters)
+      # TODO: Uncomment when 5_min_orb_confirmation module is implemented
+      # elif strategy == "5_min_orb_confirmation":
+      #     return five_min_orb_confirmation_signals(df, parameters)
       else:
           return None
     except Exception as e:
@@ -80,5 +93,10 @@ async def calculate_signals_async(df, df1d, strategy, parameters):
       params = parameters or {}
       df_4h = params.get('df_4h', df1d)
       return mean_reversion_trend_filter_signals(df, df_4h, params)
+  elif strategy == "5_min_orb":
+      return five_min_orb_signals(df, parameters)
+  # TODO: Uncomment when 5_min_orb_confirmation module is implemented
+  # elif strategy == "5_min_orb_confirmation":
+  #     return five_min_orb_confirmation_signals(df, parameters)
   else:
       return None
