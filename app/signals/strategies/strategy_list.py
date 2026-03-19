@@ -18,5 +18,10 @@ strategy_list = [
     "fvg_confirmation",
     "swing-1",
     "double_candle",
-    "mean_reversion_trend_filter"
+    "mean_reversion_trend_filter",
+
+    # 5-Minute ORB Strategies
+    "5_min_orb",
+    # TODO: Uncomment when 5_min_orb_confirmation module is implemented
+    # "5_min_orb_confirmation",
 ]
