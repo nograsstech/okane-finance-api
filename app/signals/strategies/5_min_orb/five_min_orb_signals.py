@@ -107,6 +107,13 @@ def five_min_orb_signals(
     or_state = {}  # Track OR state per date
     pending_signal = None  # Track pending signal for next candle
 
+    # Debug counters
+    sessions_detected = 0
+    ors_formed = 0
+    ors_skipped = 0
+    breakouts_detected = 0
+    signals_scheduled = 0
+
     # Calculate pip value once (reused in loop)
     pip_value = calculate_pip_value(ticker)
 
@@ -159,6 +166,7 @@ def five_min_orb_signals(
 
         elif window == 'active':
             # Within active window (after 08:05 London or 09:35 NY)
+            sessions_detected += 1
 
             # Check if OR has been identified yet
             if or_state[date_str]['or_high'] is None:
@@ -174,6 +182,7 @@ def five_min_orb_signals(
                 should_skip, skip_reason = should_skip_session(or_size_pips, ticker, session)
 
                 if should_skip:
+                    ors_skipped += 1
                     or_state[date_str]['skip_reason'] = skip_reason
                     or_state[date_str]['or_high'] = or_high
                     or_state[date_str]['or_low'] = or_low
@@ -181,6 +190,7 @@ def five_min_orb_signals(
                     or_state[date_str]['or_time'] = idx
                 else:
                     # Valid OR identified
+                    ors_formed += 1
                     or_state[date_str]['or_high'] = or_high
                     or_state[date_str]['or_low'] = or_low
                     or_state[date_str]['or_size_pips'] = or_size_pips
@@ -211,6 +221,7 @@ def five_min_orb_signals(
 
                 # Check for long breakout (close above OR_High)
                 if row['Close'] > or_high:
+                    breakouts_detected += 1
                     # Check entry filters
 
                     # 1. Chase threshold: don't chase if price moved too far
@@ -232,10 +243,12 @@ def five_min_orb_signals(
                         continue
 
                     # All filters passed, schedule long signal for next candle
+                    signals_scheduled += 1
                     pending_signal = {'signal_type': SIGNAL_BUY, 'timestamp': idx}
 
                 # Check for short breakout (close below OR_Low)
                 elif row['Close'] < or_low:
+                    breakouts_detected += 1
                     # Check entry filters
 
                     # 1. Chase threshold
@@ -257,6 +270,11 @@ def five_min_orb_signals(
                         continue
 
                     # All filters passed, schedule short signal for next candle
+                    signals_scheduled += 1
                     pending_signal = {'signal_type': SIGNAL_SELL, 'timestamp': idx}
+
+    # Debug output
+    print(f"5_min_orb signals: sessions={sessions_detected}, ORs formed={ors_formed}, ORs skipped={ors_skipped}, breakouts={breakouts_detected}, signals={signals_scheduled}")
+    print(f"Total non-zero signals: {(df['TotalSignal'] != 0).sum()}")
 
     return df
