@@ -17,6 +17,11 @@ get_or_threshold = _orb_utils.get_or_threshold
 should_skip_session = _orb_utils.should_skip_session
 identify_opening_range = _orb_utils.identify_opening_range
 
+# Import backtest module
+_five_min_orb_backtest = importlib.import_module("app.signals.strategies.5_min_orb.five_min_orb_backtest")
+backtest = _five_min_orb_backtest.backtest
+FiveMinORBStrat = _five_min_orb_backtest.FiveMinORBStrat
+
 __all__ = [
     "convert_utc_to_session_time",
     "detect_session_window",
@@ -25,4 +30,6 @@ __all__ = [
     "get_or_threshold",
     "should_skip_session",
     "identify_opening_range",
+    "backtest",
+    "FiveMinORBStrat",
 ]
