@@ -3,10 +3,10 @@ Tests for ORB utilities module.
 
 Tests timezone conversion, session detection, and OR calculations.
 """
+
 import pytest
 import importlib
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, UTC
 
 # Import from module with numeric name using importlib
 orb_utils = importlib.import_module("app.signals.strategies.5_min_orb.orb_utils")
@@ -25,7 +25,7 @@ class TestConvertUtcToSessionTime:
     def test_convert_utc_to_london_winter(self):
         """January should be GMT+0 (no DST)."""
         # January 15, 2025, 10:00 UTC = 10:00 London time (GMT)
-        utc_time = datetime(2025, 1, 15, 10, 0, tzinfo=timezone.utc)
+        utc_time = datetime(2025, 1, 15, 10, 0, tzinfo=UTC)
         london_time = convert_utc_to_session_time(utc_time, "london")
 
         assert london_time.hour == 10
@@ -34,7 +34,7 @@ class TestConvertUtcToSessionTime:
     def test_convert_utc_to_london_summer(self):
         """July should be GMT+1 (BST with DST)."""
         # July 15, 2025, 10:00 UTC = 11:00 London time (BST)
-        utc_time = datetime(2025, 7, 15, 10, 0, tzinfo=timezone.utc)
+        utc_time = datetime(2025, 7, 15, 10, 0, tzinfo=UTC)
         london_time = convert_utc_to_session_time(utc_time, "london")
 
         assert london_time.hour == 11
@@ -43,7 +43,7 @@ class TestConvertUtcToSessionTime:
     def test_convert_utc_to_ny_est(self):
         """January should be EST (GMT-5, no DST)."""
         # January 15, 2025, 15:00 UTC = 10:00 NY time (EST)
-        utc_time = datetime(2025, 1, 15, 15, 0, tzinfo=timezone.utc)
+        utc_time = datetime(2025, 1, 15, 15, 0, tzinfo=UTC)
         ny_time = convert_utc_to_session_time(utc_time, "ny")
 
         assert ny_time.hour == 10
@@ -52,7 +52,7 @@ class TestConvertUtcToSessionTime:
     def test_convert_utc_to_ny_edt(self):
         """July should be EDT (GMT-4, with DST)."""
         # July 15, 2025, 14:00 UTC = 10:00 NY time (EDT)
-        utc_time = datetime(2025, 7, 15, 14, 0, tzinfo=timezone.utc)
+        utc_time = datetime(2025, 7, 15, 14, 0, tzinfo=UTC)
         ny_time = convert_utc_to_session_time(utc_time, "ny")
 
         assert ny_time.hour == 10
@@ -65,7 +65,7 @@ class TestDetectSessionWindow:
     def test_detect_session_window_london_active(self):
         """08:10 London time should be 'active' (after 08:05)."""
         # January 15, 2025, 08:10 UTC = 08:10 London time
-        utc_time = datetime(2025, 1, 15, 8, 10, tzinfo=timezone.utc)
+        utc_time = datetime(2025, 1, 15, 8, 10, tzinfo=UTC)
         window = detect_session_window(utc_time, "london")
 
         assert window == "active"
@@ -73,7 +73,7 @@ class TestDetectSessionWindow:
     def test_detect_session_window_london_inactive(self):
         """12:00 London time should be None (outside active window)."""
         # January 15, 2025, 12:00 UTC = 12:00 London time
-        utc_time = datetime(2025, 1, 15, 12, 0, tzinfo=timezone.utc)
+        utc_time = datetime(2025, 1, 15, 12, 0, tzinfo=UTC)
         window = detect_session_window(utc_time, "london")
 
         assert window is None
@@ -82,7 +82,7 @@ class TestDetectSessionWindow:
         """09:40 NY time should be 'active' (after 09:35)."""
         # July 15, 2025, 14:40 UTC = 10:40 NY time (EDT, GMT-4)
         # Actually 14:40 UTC = 10:40 EDT, so 09:40 EDT = 13:40 UTC
-        utc_time = datetime(2025, 7, 15, 13, 40, tzinfo=timezone.utc)
+        utc_time = datetime(2025, 7, 15, 13, 40, tzinfo=UTC)
         window = detect_session_window(utc_time, "ny")
 
         assert window == "active"
