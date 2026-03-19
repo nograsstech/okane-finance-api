@@ -131,6 +131,8 @@ def five_min_orb_signals(
         sessions = [sessions_to_process]
 
     print(f"Processing sessions: {sessions}", file=sys.stderr)
+    print(f"Date range: {df.index[0]} to {df.index[-1]}", file=sys.stderr)
+    print(f"Sample times (first 3 candles): {df.index[0].time()}, {df.index[1].time()}, {df.index[2].time()}", file=sys.stderr)
     sys.stderr.flush()
 
     # Cutoff times in local time
@@ -147,6 +149,14 @@ def five_min_orb_signals(
             local_time = convert_utc_to_session_time(idx, session)
             date_str = idx.strftime('%Y-%m-%d')
             session_key = f"{date_str}_{session}"  # Unique key per session per date
+
+            # Debug: Log first few candles for first session
+            if sessions_detected == 0 and ors_formed == 0 and signals_scheduled == 0:
+                window = detect_session_window(idx, session)
+                if len(str(idx)) < 100:  # Only log first few times
+                    print(f"  Candle: {idx} UTC -> {local_time} {session} | Window: {window}", file=sys.stderr)
+                    if sessions_detected > 5:
+                        print("  ... (debugging stopped after 5 candles)", file=sys.stderr)
 
             # Initialize state for new session/date
             if session_key not in or_state:
@@ -171,126 +181,134 @@ def five_min_orb_signals(
             if or_state[session_key]['trade_taken']:
                 continue
 
-        # Check cutoff time
-        if local_time.time() >= cutoff_times[session]:
-            continue
+            # Check cutoff time
+            if local_time.time() >= cutoff_times[session]:
+                continue
 
-        # Detect session window
-        window = detect_session_window(idx, session)
+            # Detect session window
+            window = detect_session_window(idx, session)
 
-        if window == 'open':
-            # This is the open candle (08:00 London or 09:30 NY)
-            # OR will be the NEXT candle (08:05 or 09:35)
-            pass
+            # Debug: Log first few candles for London session
+            if session == 'london' and sessions_detected == 0 and ors_formed == 0:
+                _debug_counter = locals().get('_debug_counter', 0)
+                if _debug_counter < 10:
+                    import sys
+                    print(f"  Candle {_debug_counter}: {idx.strftime('%H:%M:%S')} UTC -> {local_time.strftime('%H:%M:%S')} London | Window: {window}", file=sys.stderr)
+                    globals()['_debug_counter'] = _debug_counter + 1
 
-        elif window == 'active':
-            # Within active window (after 08:05 London or 09:35 NY)
-            sessions_detected += 1
+            if window == 'open':
+                # This is the open candle (08:00 London or 09:30 NY)
+                # OR will be the NEXT candle (08:05 or 09:35)
+                pass
 
-            # Check if OR has been identified yet
-            if or_state[session_key]['or_high'] is None:
-                # OR not yet identified - this candle IS the OR candle
-                # (the first candle that closes after session open)
+            elif window == 'active':
+                # Within active window (after 08:05 London or 09:35 NY)
+                sessions_detected += 1
 
-                # The current candle's OHLC data is the OR
-                or_high = row['High']
-                or_low = row['Low']
-                or_size_pips = calculate_or_size_pips(or_high, or_low, pip_value)
+                # Check if OR has been identified yet
+                if or_state[session_key]['or_high'] is None:
+                    # OR not yet identified - this candle IS the OR candle
+                    # (the first candle that closes after session open)
 
-                # Check if session should be skipped
-                should_skip, skip_reason = should_skip_session(or_size_pips, ticker, session)
+                    # The current candle's OHLC data is the OR
+                    or_high = row['High']
+                    or_low = row['Low']
+                    or_size_pips = calculate_or_size_pips(or_high, or_low, pip_value)
 
-                if should_skip:
-                    ors_skipped += 1
-                    or_state[session_key]['skip_reason'] = skip_reason
-                    or_state[session_key]['or_high'] = or_high
-                    or_state[session_key]['or_low'] = or_low
-                    or_state[session_key]['or_size_pips'] = or_size_pips
-                    or_state[session_key]['or_time'] = idx
+                    # Check if session should be skipped
+                    should_skip, skip_reason = should_skip_session(or_size_pips, ticker, session)
+
+                    if should_skip:
+                        ors_skipped += 1
+                        or_state[session_key]['skip_reason'] = skip_reason
+                        or_state[session_key]['or_high'] = or_high
+                        or_state[session_key]['or_low'] = or_low
+                        or_state[session_key]['or_size_pips'] = or_size_pips
+                        or_state[session_key]['or_time'] = idx
+                    else:
+                        # Valid OR identified
+                        ors_formed += 1
+                        or_state[session_key]['or_high'] = or_high
+                        or_state[session_key]['or_low'] = or_low
+                        or_state[session_key]['or_size_pips'] = or_size_pips
+                        or_state[session_key]['or_time'] = idx
+
+                    # Set OR values for this candle
+                    df.loc[idx, 'OR_High'] = or_high
+                    df.loc[idx, 'OR_Low'] = or_low
+                    df.loc[idx, 'OR_Size_Pips'] = or_size_pips
+                    df.loc[idx, 'OR_Session'] = session
+
                 else:
-                    # Valid OR identified
-                    ors_formed += 1
-                    or_state[session_key]['or_high'] = or_high
-                    or_state[session_key]['or_low'] = or_low
-                    or_state[session_key]['or_size_pips'] = or_size_pips
-                    or_state[session_key]['or_time'] = idx
+                    # OR has been identified, check for breakouts
 
-                # Set OR values for this candle
-                df.loc[idx, 'OR_High'] = or_high
-                df.loc[idx, 'OR_Low'] = or_low
-                df.loc[idx, 'OR_Size_Pips'] = or_size_pips
-                df.loc[idx, 'OR_Session'] = session
-
-            else:
-                # OR has been identified, check for breakouts
-
-                # Skip if session was marked to skip
-                if or_state[session_key]['skip_reason'] is not None:
-                    continue
-
-                or_high = or_state[session_key]['or_high']
-                or_low = or_state[session_key]['or_low']
-                or_size_pips = or_state[session_key]['or_size_pips']
-
-                # Set OR values for all candles after OR formation
-                df.loc[idx, 'OR_High'] = or_high
-                df.loc[idx, 'OR_Low'] = or_low
-                df.loc[idx, 'OR_Size_Pips'] = or_size_pips
-                df.loc[idx, 'OR_Session'] = session
-
-                # Check for long breakout (close above OR_High)
-                if row['Close'] > or_high:
-                    breakouts_detected += 1
-                    # Check entry filters
-
-                    # 1. Chase threshold: don't chase if price moved too far
-                    move_from_or_high = (row['Close'] - or_high) / pip_value  # in pips
-                    threshold_pips = or_size_pips * chase_threshold
-
-                    if move_from_or_high > threshold_pips:
-                        # Too far, skip
+                    # Skip if session was marked to skip
+                    if or_state[session_key]['skip_reason'] is not None:
                         continue
 
-                    # 2. Weak close: wick > body
-                    body = abs(row['Close'] - row['Open'])
-                    upper_wick = row['High'] - row['Close']
-                    lower_wick = row['Open'] - row['Low']
+                    or_high = or_state[session_key]['or_high']
+                    or_low = or_state[session_key]['or_low']
+                    or_size_pips = or_state[session_key]['or_size_pips']
 
-                    # For long breakout, check upper wick
-                    if upper_wick > body:
-                        # Weak close, skip
-                        continue
+                    # Set OR values for all candles after OR formation
+                    df.loc[idx, 'OR_High'] = or_high
+                    df.loc[idx, 'OR_Low'] = or_low
+                    df.loc[idx, 'OR_Size_Pips'] = or_size_pips
+                    df.loc[idx, 'OR_Session'] = session
 
-                    # All filters passed, schedule long signal for next candle
-                    signals_scheduled += 1
-                    pending_signal = {'signal_type': SIGNAL_BUY, 'timestamp': idx}
+                    # Check for long breakout (close above OR_High)
+                    if row['Close'] > or_high:
+                        breakouts_detected += 1
+                        # Check entry filters
 
-                # Check for short breakout (close below OR_Low)
-                elif row['Close'] < or_low:
-                    breakouts_detected += 1
-                    # Check entry filters
+                        # 1. Chase threshold: don't chase if price moved too far
+                        move_from_or_high = (row['Close'] - or_high) / pip_value  # in pips
+                        threshold_pips = or_size_pips * chase_threshold
 
-                    # 1. Chase threshold
-                    move_from_or_low = (or_low - row['Close']) / pip_value  # in pips
-                    threshold_pips = or_size_pips * chase_threshold
+                        if move_from_or_high > threshold_pips:
+                            # Too far, skip
+                            continue
 
-                    if move_from_or_low > threshold_pips:
-                        # Too far, skip
-                        continue
+                        # 2. Weak close: wick > body
+                        body = abs(row['Close'] - row['Open'])
+                        upper_wick = row['High'] - row['Close']
+                        lower_wick = row['Open'] - row['Low']
 
-                    # 2. Weak close: wick > body
-                    body = abs(row['Close'] - row['Open'])
-                    upper_wick = row['High'] - row['Close']
-                    lower_wick = row['Open'] - row['Low']
+                        # For long breakout, check upper wick
+                        if upper_wick > body:
+                            # Weak close, skip
+                            continue
 
-                    # For short breakout, check lower wick
-                    if lower_wick > body:
-                        # Weak close, skip
-                        continue
+                        # All filters passed, schedule long signal for next candle
+                        signals_scheduled += 1
+                        pending_signal = {'signal_type': SIGNAL_BUY, 'timestamp': idx}
 
-                    # All filters passed, schedule short signal for next candle
-                    signals_scheduled += 1
-                    pending_signal = {'signal_type': SIGNAL_SELL, 'timestamp': idx}
+                    # Check for short breakout (close below OR_Low)
+                    elif row['Close'] < or_low:
+                        breakouts_detected += 1
+                        # Check entry filters
+
+                        # 1. Chase threshold
+                        move_from_or_low = (or_low - row['Close']) / pip_value  # in pips
+                        threshold_pips = or_size_pips * chase_threshold
+
+                        if move_from_or_low > threshold_pips:
+                            # Too far, skip
+                            continue
+
+                        # 2. Weak close: wick > body
+                        body = abs(row['Close'] - row['Open'])
+                        upper_wick = row['High'] - row['Close']
+                        lower_wick = row['Open'] - row['Low']
+
+                        # For short breakout, check lower wick
+                        if lower_wick > body:
+                            # Weak close, skip
+                            continue
+
+                        # All filters passed, schedule short signal for next candle
+                        signals_scheduled += 1
+                        pending_signal = {'signal_type': SIGNAL_SELL, 'timestamp': idx}
 
     # Debug output
     print(f"5_min_orb signals: sessions={sessions_detected}, ORs formed={ors_formed}, ORs skipped={ors_skipped}, breakouts={breakouts_detected}, signals={signals_scheduled}", file=sys.stderr)
