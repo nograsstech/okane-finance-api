@@ -4,10 +4,9 @@ ORB utilities module.
 Shared utilities for 5-minute Opening Range Breakout strategies.
 Provides timezone conversion, session detection, and OR calculation functions.
 """
-from datetime import datetime, timezone, time
-from zoneinfo import ZoneInfo
-from typing import Optional, Tuple
 
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 # Session windows in local time
 SESSION_WINDOWS = {
@@ -75,7 +74,7 @@ def convert_utc_to_session_time(utc_time: datetime, session: str) -> datetime:
     return utc_time.astimezone(tz).replace(tzinfo=None)
 
 
-def detect_session_window(utc_time: datetime, session: str) -> Optional[str]:
+def detect_session_window(utc_time: datetime, session: str) -> str | None:
     """
     Detect if the given time is within the active trading window.
 
@@ -148,7 +147,7 @@ def calculate_or_size_pips(or_high: float, or_low: float, pip_value: float) -> f
     return range_size / pip_value
 
 
-def get_or_threshold(ticker: str, session: str) -> Optional[int]:
+def get_or_threshold(ticker: str, session: str) -> int | None:
     """
     Get maximum OR size threshold for a ticker and session.
 
@@ -168,9 +167,7 @@ def get_or_threshold(ticker: str, session: str) -> Optional[int]:
     return None
 
 
-def should_skip_session(
-    or_size_pips: float, ticker: str, session: str
-) -> Tuple[bool, Optional[str]]:
+def should_skip_session(or_size_pips: float, ticker: str, session: str) -> tuple[bool, str | None]:
     """
     Determine if a session should be skipped based on OR size.
 
