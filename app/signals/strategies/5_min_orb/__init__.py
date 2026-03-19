@@ -15,6 +15,7 @@ calculate_pip_value = _orb_utils.calculate_pip_value
 calculate_or_size_pips = _orb_utils.calculate_or_size_pips
 get_or_threshold = _orb_utils.get_or_threshold
 should_skip_session = _orb_utils.should_skip_session
+identify_opening_range = _orb_utils.identify_opening_range
 
 __all__ = [
     "convert_utc_to_session_time",
@@ -23,4 +24,5 @@ __all__ = [
     "calculate_or_size_pips",
     "get_or_threshold",
     "should_skip_session",
+    "identify_opening_range",
 ]

@@ -6,7 +6,8 @@ Tests timezone conversion, session detection, and OR calculations.
 
 import pytest
 import importlib
-from datetime import datetime, UTC
+import pandas as pd
+from datetime import datetime, UTC, date
 
 # Import from module with numeric name using importlib
 orb_utils = importlib.import_module("app.signals.strategies.5_min_orb.orb_utils")
@@ -17,6 +18,7 @@ calculate_pip_value = orb_utils.calculate_pip_value
 calculate_or_size_pips = orb_utils.calculate_or_size_pips
 get_or_threshold = orb_utils.get_or_threshold
 should_skip_session = orb_utils.should_skip_session
+identify_opening_range = orb_utils.identify_opening_range
 
 
 class TestConvertUtcToSessionTime:
@@ -194,3 +196,123 @@ class TestShouldSkipSession:
 
         # Should only skip if below minimum
         assert should_skip is False
+
+
+class TestIdentifyOpeningRange:
+    """Test opening range identification."""
+
+    def test_identify_opening_range_london_session(self):
+        """Test identifying London OR on 2026-01-15."""
+        # Create sample data for EUR/USD on 2026-01-15
+        # London open at 08:00 local time = 08:00 UTC (January is GMT)
+        # First 5-min candle closing after 08:00 is 08:05
+        data = {
+            "Open": [1.0850, 1.0852, 1.0848, 1.0855, 1.0860, 1.0858],
+            "High": [1.0855, 1.0856, 1.0853, 1.0860, 1.0865, 1.0862],
+            "Low": [1.0848, 1.0850, 1.0846, 1.0852, 1.0855, 1.0856],
+            "Close": [1.0852, 1.0854, 1.0850, 1.0858, 1.0862, 1.0859],
+        }
+        # Timestamps: 07:55, 08:00, 08:05, 08:10, 08:15, 08:20 UTC
+        index = pd.to_datetime([
+            "2026-01-15 07:55:00+00:00",
+            "2026-01-15 08:00:00+00:00",
+            "2026-01-15 08:05:00+00:00",
+            "2026-01-15 08:10:00+00:00",
+            "2026-01-15 08:15:00+00:00",
+            "2026-01-15 08:20:00+00:00",
+        ])
+        df = pd.DataFrame(data, index=index)
+
+        # Identify opening range
+        result = identify_opening_range(
+            df=df,
+            ticker="EUR/USD",
+            session="london",
+            date_str="2026-01-15"
+        )
+
+        # Should find the 08:05 candle as the OR
+        assert result is not None
+        assert result["or_high"] == 1.0853  # High of 08:05 candle
+        assert result["or_low"] == 1.0846   # Low of 08:05 candle
+        assert result["or_time_index"] == pd.Timestamp("2026-01-15 08:05:00+00:00")
+        assert result["skip"] is False
+        assert result["skip_reason"] is None
+
+        # OR size should be 7 pips
+        expected_pips = (1.0853 - 1.0846) / 0.0001
+        assert result["or_size_pips"] == pytest.approx(expected_pips)
+
+    def test_identify_opening_range_no_session_data(self):
+        """Test when no session data exists for the date."""
+        # Create data for a different date
+        data = {
+            "Open": [1.0850],
+            "High": [1.0855],
+            "Low": [1.0848],
+            "Close": [1.0852],
+        }
+        index = pd.to_datetime(["2026-01-16 08:00:00+00:00"])
+        df = pd.DataFrame(data, index=index)
+
+        # Try to find OR for a different date
+        result = identify_opening_range(
+            df=df,
+            ticker="EUR/USD",
+            session="london",
+            date_str="2026-01-15"
+        )
+
+        # Should return None when no data for the date
+        assert result is None
+
+    def test_identify_opening_range_skip_threshold(self):
+        """Test skipping when OR exceeds threshold."""
+        # Create data with large OR
+        data = {
+            "Open": [1.0850],
+            "High": [1.0900],  # 50 pip range
+            "Low": [1.0850],
+            "Close": [1.0875],
+        }
+        index = pd.to_datetime(["2026-01-15 08:05:00+00:00"])
+        df = pd.DataFrame(data, index=index)
+
+        result = identify_opening_range(
+            df=df,
+            ticker="EUR/USD",
+            session="london",
+            date_str="2026-01-15"
+        )
+
+        assert result is not None
+        assert result["skip"] is True
+        assert "threshold" in result["skip_reason"].lower()
+
+    def test_identify_opening_range_ny_session_edt(self):
+        """Test identifying NY OR during DST (EDT)."""
+        # July 2026: NY is EDT (UTC-4)
+        # NY open at 09:30 EDT = 13:30 UTC
+        # First 5-min candle closing after 13:30 is 13:35
+        data = {
+            "Open": [1.0850, 1.0852],
+            "High": [1.0855, 1.0858],
+            "Low": [1.0848, 1.0850],
+            "Close": [1.0852, 1.0855],
+        }
+        # Timestamps: 13:30, 13:35 UTC
+        index = pd.to_datetime([
+            "2026-07-15 13:30:00+00:00",
+            "2026-07-15 13:35:00+00:00",
+        ])
+        df = pd.DataFrame(data, index=index)
+
+        result = identify_opening_range(
+            df=df,
+            ticker="EUR/USD",
+            session="ny",
+            date_str="2026-07-15"
+        )
+
+        assert result is not None
+        assert result["or_time_index"] == pd.Timestamp("2026-07-15 13:35:00+00:00")
