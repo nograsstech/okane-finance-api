@@ -13,8 +13,8 @@ Version A: Immediate breakout entry
 """
 
 import importlib
-from datetime import datetime, time, UTC
-from typing import Any, Dict, Optional
+from datetime import UTC, time
+from typing import Any
 
 import pandas as pd
 
@@ -29,8 +29,15 @@ should_skip_session = orb_utils.should_skip_session
 detect_session_window = orb_utils.detect_session_window
 MIN_OR_SIZE_PIPS = orb_utils.MIN_OR_SIZE_PIPS
 
+# Signal value constants
+SIGNAL_NONE = 0
+SIGNAL_SELL = 1
+SIGNAL_BUY = 2
 
-def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
+
+def five_min_orb_signals(
+    df: pd.DataFrame, parameters: dict[str, Any] | None = None
+) -> pd.DataFrame:
     """
     Generate ORB signals for Version A (immediate breakout entry).
 
@@ -41,7 +48,6 @@ def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] 
             - ticker: Instrument ticker (default: 'EUR/USD')
             - session: 'london' or 'ny' (default: 'london')
             - chase_threshold: Max move as % of OR size (default: 0.5)
-            - spread_buffer_pips: Buffer for spread (default: 2)
 
     Returns:
         DataFrame with added columns:
@@ -59,7 +65,10 @@ def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] 
     ticker = parameters.get("ticker", "EUR/USD")
     session = parameters.get("session", "london")
     chase_threshold = parameters.get("chase_threshold", 0.5)
-    spread_buffer_pips = parameters.get("spread_buffer_pips", 2)
+
+    # Input validation
+    if chase_threshold < 0:
+        raise ValueError("chase_threshold must be non-negative")
 
     # Make a copy to avoid modifying original
     df = df.copy()
@@ -95,8 +104,11 @@ def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] 
     df['TotalSignal'] = 0
 
     # State tracking
-    or_state = {}  # Track OR state per date: {date_str: {or_high, or_low, or_size_pips, trade_taken}}
-    pending_signal = None  # Track pending signal for next candle: {signal_type, timestamp}
+    or_state = {}  # Track OR state per date
+    pending_signal = None  # Track pending signal for next candle
+
+    # Calculate pip value once (reused in loop)
+    pip_value = calculate_pip_value(ticker)
 
     # Cutoff times in local time
     cutoff_times = {
@@ -156,7 +168,6 @@ def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] 
                 # The current candle's OHLC data is the OR
                 or_high = row['High']
                 or_low = row['Low']
-                pip_value = calculate_pip_value(ticker)
                 or_size_pips = calculate_or_size_pips(or_high, or_low, pip_value)
 
                 # Check if session should be skipped
@@ -203,7 +214,6 @@ def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] 
                     # Check entry filters
 
                     # 1. Chase threshold: don't chase if price moved too far
-                    pip_value = calculate_pip_value(ticker)
                     move_from_or_high = (row['Close'] - or_high) / pip_value  # in pips
                     threshold_pips = or_size_pips * chase_threshold
 
@@ -222,14 +232,13 @@ def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] 
                         continue
 
                     # All filters passed, schedule long signal for next candle
-                    pending_signal = {'signal_type': 2, 'timestamp': idx}
+                    pending_signal = {'signal_type': SIGNAL_BUY, 'timestamp': idx}
 
                 # Check for short breakout (close below OR_Low)
                 elif row['Close'] < or_low:
                     # Check entry filters
 
                     # 1. Chase threshold
-                    pip_value = calculate_pip_value(ticker)
                     move_from_or_low = (or_low - row['Close']) / pip_value  # in pips
                     threshold_pips = or_size_pips * chase_threshold
 
@@ -248,6 +257,6 @@ def five_min_orb_signals(df: pd.DataFrame, parameters: Optional[Dict[str, Any]] 
                         continue
 
                     # All filters passed, schedule short signal for next candle
-                    pending_signal = {'signal_type': 1, 'timestamp': idx}
+                    pending_signal = {'signal_type': SIGNAL_SELL, 'timestamp': idx}
 
     return df
