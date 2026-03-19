@@ -58,12 +58,19 @@ def five_min_orb_signals(
         - Pip_Value: Pip value for instrument
         - TotalSignal: 0=None, 1=Sell, 2=Buy
     """
+    import sys
+    print("=== five_min_orb_signals called ===", file=sys.stderr)
+    print(f"DataFrame shape: {df.shape}", file=sys.stderr)
+    print(f"Parameters: {parameters}", file=sys.stderr)
+    sys.stderr.flush()
+
     # Set default parameters
     if parameters is None:
         parameters = {}
 
     ticker = parameters.get("ticker", "EUR/USD")
-    session = parameters.get("session", "london")
+    # Process both London and NY sessions
+    sessions_to_process = parameters.get("session", "both")  # "london", "ny", or "both"
     chase_threshold = parameters.get("chase_threshold", 0.5)
 
     # Input validation
@@ -117,40 +124,52 @@ def five_min_orb_signals(
     # Calculate pip value once (reused in loop)
     pip_value = calculate_pip_value(ticker)
 
+    # Determine which sessions to process
+    if sessions_to_process == "both":
+        sessions = ['london', 'ny']
+    else:
+        sessions = [sessions_to_process]
+
+    print(f"Processing sessions: {sessions}", file=sys.stderr)
+    sys.stderr.flush()
+
     # Cutoff times in local time
     cutoff_times = {
         'london': time(11, 0),
         'ny': time(12, 0),
     }
 
-    # Process each candle
-    for idx, row in df.iterrows():
-        # Convert to session local time
-        local_time = convert_utc_to_session_time(idx, session)
-        date_str = idx.strftime('%Y-%m-%d')
+    # Process each session
+    for session in sessions:
+        # Process each candle
+        for idx, row in df.iterrows():
+            # Convert to session local time
+            local_time = convert_utc_to_session_time(idx, session)
+            date_str = idx.strftime('%Y-%m-%d')
+            session_key = f"{date_str}_{session}"  # Unique key per session per date
 
-        # Initialize state for new date
-        if date_str not in or_state:
-            or_state[date_str] = {
-                'or_high': None,
-                'or_low': None,
-                'or_size_pips': None,
-                'or_time': None,
-                'trade_taken': False,
-                'skip_reason': None,
-            }
+            # Initialize state for new session/date
+            if session_key not in or_state:
+                or_state[session_key] = {
+                    'or_high': None,
+                    'or_low': None,
+                    'or_size_pips': None,
+                    'or_time': None,
+                    'trade_taken': False,
+                    'skip_reason': None,
+                }
 
-        # Check if we have a pending signal from previous candle
-        if pending_signal is not None:
-            # Apply signal at this candle's open
-            df.loc[idx, 'TotalSignal'] = pending_signal['signal_type']
-            or_state[date_str]['trade_taken'] = True
-            pending_signal = None
-            continue
+            # Check if we have a pending signal from previous candle
+            if pending_signal is not None:
+                # Apply signal at this candle's open
+                df.loc[idx, 'TotalSignal'] = pending_signal['signal_type']
+                or_state[session_key]['trade_taken'] = True
+                pending_signal = None
+                continue
 
-        # Skip if trade already taken this session
-        if or_state[date_str]['trade_taken']:
-            continue
+            # Skip if trade already taken this session
+            if or_state[session_key]['trade_taken']:
+                continue
 
         # Check cutoff time
         if local_time.time() >= cutoff_times[session]:
@@ -169,7 +188,7 @@ def five_min_orb_signals(
             sessions_detected += 1
 
             # Check if OR has been identified yet
-            if or_state[date_str]['or_high'] is None:
+            if or_state[session_key]['or_high'] is None:
                 # OR not yet identified - this candle IS the OR candle
                 # (the first candle that closes after session open)
 
@@ -183,18 +202,18 @@ def five_min_orb_signals(
 
                 if should_skip:
                     ors_skipped += 1
-                    or_state[date_str]['skip_reason'] = skip_reason
-                    or_state[date_str]['or_high'] = or_high
-                    or_state[date_str]['or_low'] = or_low
-                    or_state[date_str]['or_size_pips'] = or_size_pips
-                    or_state[date_str]['or_time'] = idx
+                    or_state[session_key]['skip_reason'] = skip_reason
+                    or_state[session_key]['or_high'] = or_high
+                    or_state[session_key]['or_low'] = or_low
+                    or_state[session_key]['or_size_pips'] = or_size_pips
+                    or_state[session_key]['or_time'] = idx
                 else:
                     # Valid OR identified
                     ors_formed += 1
-                    or_state[date_str]['or_high'] = or_high
-                    or_state[date_str]['or_low'] = or_low
-                    or_state[date_str]['or_size_pips'] = or_size_pips
-                    or_state[date_str]['or_time'] = idx
+                    or_state[session_key]['or_high'] = or_high
+                    or_state[session_key]['or_low'] = or_low
+                    or_state[session_key]['or_size_pips'] = or_size_pips
+                    or_state[session_key]['or_time'] = idx
 
                 # Set OR values for this candle
                 df.loc[idx, 'OR_High'] = or_high
@@ -206,12 +225,12 @@ def five_min_orb_signals(
                 # OR has been identified, check for breakouts
 
                 # Skip if session was marked to skip
-                if or_state[date_str]['skip_reason'] is not None:
+                if or_state[session_key]['skip_reason'] is not None:
                     continue
 
-                or_high = or_state[date_str]['or_high']
-                or_low = or_state[date_str]['or_low']
-                or_size_pips = or_state[date_str]['or_size_pips']
+                or_high = or_state[session_key]['or_high']
+                or_low = or_state[session_key]['or_low']
+                or_size_pips = or_state[session_key]['or_size_pips']
 
                 # Set OR values for all candles after OR formation
                 df.loc[idx, 'OR_High'] = or_high
@@ -274,7 +293,8 @@ def five_min_orb_signals(
                     pending_signal = {'signal_type': SIGNAL_SELL, 'timestamp': idx}
 
     # Debug output
-    print(f"5_min_orb signals: sessions={sessions_detected}, ORs formed={ors_formed}, ORs skipped={ors_skipped}, breakouts={breakouts_detected}, signals={signals_scheduled}")
-    print(f"Total non-zero signals: {(df['TotalSignal'] != 0).sum()}")
+    print(f"5_min_orb signals: sessions={sessions_detected}, ORs formed={ors_formed}, ORs skipped={ors_skipped}, breakouts={breakouts_detected}, signals={signals_scheduled}", file=sys.stderr)
+    print(f"Total non-zero signals: {(df['TotalSignal'] != 0).sum()}", file=sys.stderr)
+    sys.stderr.flush()
 
     return df
