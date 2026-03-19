@@ -195,14 +195,41 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     FiveMinORBStrat.tp2_multiplier = _strategy_parameters.get("tp2_multiplier", 2.0)
     FiveMinORBStrat.trades_actions = []
 
-    # Skip optimization — use provided best_params or defaults
-    if best_params is None:
+    # Do optimization if skip_optimization is False
+    if not skip_optimization:
+        t_opt = _time.time()
+        print("[ORB backtest] Starting optimization (2×2×2 = 8 combos)...")
+        bt = Backtest(dftest, FiveMinORBStrat, cash=cash, margin=margin, finalize_trades=True)
+
+        stats, heatmap = bt.optimize(
+            spread_buffer_pips=[1, 3],
+            tp1_multiplier=[0.5, 1.5],
+            tp2_multiplier=[1.5, 2.5],
+            maximize="Win Rate [%]",
+            max_tries=8,
+            random_state=0,
+            return_heatmap=True,
+        )
+        print(f"[ORB backtest] Optimization done in {_time.time() - t_opt:.1f}s")
+
+        heatmap_df = heatmap.unstack()
+        max_value = heatmap_df.max().max()
+        optimized_params = (heatmap_df == max_value).stack().idxmax()
+
         best_params = {
-            'spread_buffer_pips': 2,
-            'tp1_multiplier': 1.0,
-            'tp2_multiplier': 2.0
+            'spread_buffer_pips': optimized_params[0],
+            'tp1_multiplier': optimized_params[1],
+            'tp2_multiplier': optimized_params[2]
         }
-    print("[ORB backtest] Using params:", best_params)
+        print(f"[ORB backtest] Best params: {best_params}")
+    else:
+        if best_params is None:
+            best_params = {
+                'spread_buffer_pips': 2,
+                'tp1_multiplier': 1.0,
+                'tp2_multiplier': 2.0
+            }
+        print("[ORB backtest] Optimization skipped, using params:", best_params)
 
     strategy_parameters = {
         "best": True,
