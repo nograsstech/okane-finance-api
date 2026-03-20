@@ -10,7 +10,14 @@ from .forex_fvg_respected.fvg_confirmation_backtest import backtest as fvg_confi
 from .swing_1.swing_backtest import backtest as swing_1_backtest
 from .double_candle.double_candle_backtest import backtest as double_candle_backtest
 from .mean_reversion_trend_filter.mean_reversion_trend_filter_backtest import backtest as mean_reversion_trend_filter_backtest
+import importlib
 from fastapi import HTTPException
+
+# Import ORB strategies using importlib due to numeric module names
+five_min_orb_module = importlib.import_module('app.signals.strategies.5_min_orb.five_min_orb_backtest')
+five_min_orb_backtest = five_min_orb_module.backtest
+five_min_orb_confirmation_module = importlib.import_module('app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_backtest')
+five_min_orb_confirmation_backtest = five_min_orb_confirmation_module.backtest
 
 def perform_backtest(df, strategy, parameters, skip_optimization=False, best_params=None):
     print(strategy)
@@ -39,6 +46,10 @@ def perform_backtest(df, strategy, parameters, skip_optimization=False, best_par
             return double_candle_backtest(df, parameters, parameters.get('size', 0.01), skip_optimization, best_params)
         elif strategy == "mean_reversion_trend_filter":
             return mean_reversion_trend_filter_backtest(df, parameters, parameters.get('size', 0.01), skip_optimization, best_params)
+        elif strategy == "5_min_orb":
+            return five_min_orb_backtest(df, parameters, parameters.get('size', 0.03), skip_optimization, best_params)
+        elif strategy == "5_min_orb_confirmation":
+            return five_min_orb_confirmation_backtest(df, parameters, parameters.get('size', 0.03), skip_optimization, best_params)
         else:
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
@@ -74,5 +85,9 @@ async def perform_backtest_async(df, strategy, parameters):
         return double_candle_backtest(df, parameters, parameters.get('size', 0.01))
     elif strategy == "mean_reversion_trend_filter":
         return mean_reversion_trend_filter_backtest(df, parameters, parameters.get('size', 0.01))
+    elif strategy == "5_min_orb":
+        return five_min_orb_backtest(df, parameters, parameters.get('size', 0.03))
+    elif strategy == "5_min_orb_confirmation":
+        return five_min_orb_confirmation_backtest(df, parameters, parameters.get('size', 0.03))
     else:
         raise HTTPException(status_code=404, detail="Not found")
