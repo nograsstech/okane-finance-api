@@ -9,13 +9,20 @@ Version A: Immediate breakout entry
 
 from backtesting import Strategy
 from backtesting import Backtest
+import logging
 import multiprocessing as mp
 import numpy as np
+import threading
+
+logger = logging.getLogger(__name__)
 
 if mp.get_start_method(allow_none=True) != 'fork':
     mp.set_start_method('fork', force=True)
 
-# Module-level data container (will be set before backtest runs)
+# Module-level data container (will be set before backtest runs).
+# Protected by _backtest_lock to prevent data races when multiple async
+# backtest requests are served concurrently.
+_backtest_lock = threading.Lock()
 _dftest = None
 _strategy_parameters = None
 
@@ -167,6 +174,12 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     Returns:
         Tuple of (backtest_object, stats, trades_actions, strategy_parameters)
     """
+    with _backtest_lock:
+        return _run_backtest(df, strategy_parameters, size, skip_optimization, best_params)
+
+
+def _run_backtest(df, strategy_parameters, size, skip_optimization, best_params):
+    """Internal implementation; must be called with _backtest_lock held."""
     import time as _time
     global _dftest, _strategy_parameters
 
@@ -174,10 +187,9 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 
     # Validate input data
     if df is None or df.empty:
-        print("five_min_orb backtest: df is None or empty")
         return None, None, [], {}
 
-    print(f"[ORB backtest] DataFrame rows: {len(df)}, signals: {(df.get('TotalSignal', 0) != 0).sum()}")
+    logger.debug("[ORB backtest] DataFrame rows: %d, signals: %d", len(df), (df.get('TotalSignal', 0) != 0).sum())
 
     dftest = df.copy()
     _dftest = dftest
@@ -198,7 +210,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     # Do optimization if skip_optimization is False
     if not skip_optimization:
         t_opt = _time.time()
-        print("[ORB backtest] Starting optimization (2×2×2 = 8 combos)...")
+        logger.debug("[ORB backtest] Starting optimization (2×2×2 = 8 combos)...")
         bt = Backtest(dftest, FiveMinORBStrat, cash=cash, margin=margin, finalize_trades=True)
 
         stats, heatmap = bt.optimize(
@@ -210,7 +222,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
             random_state=0,
             return_heatmap=True,
         )
-        print(f"[ORB backtest] Optimization done in {_time.time() - t_opt:.1f}s")
+        logger.debug("[ORB backtest] Optimization done in %.1fs", _time.time() - t_opt)
 
         heatmap_df = heatmap.unstack()
         max_value = heatmap_df.max().max()
@@ -221,7 +233,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
             'tp1_multiplier': optimized_params[1],
             'tp2_multiplier': optimized_params[2]
         }
-        print(f"[ORB backtest] Best params: {best_params}")
+        logger.debug("[ORB backtest] Best params: %s", best_params)
     else:
         if best_params is None:
             best_params = {
@@ -229,7 +241,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
                 'tp1_multiplier': 1.0,
                 'tp2_multiplier': 2.0
             }
-        print("[ORB backtest] Optimization skipped, using params:", best_params)
+        logger.debug("[ORB backtest] Optimization skipped, using params: %s", best_params)
 
     strategy_parameters = {
         "best": True,
@@ -238,7 +250,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
         "tp2_multiplier": best_params['tp2_multiplier']
     }
 
-    print(strategy_parameters)
+    logger.debug("[ORB backtest] Final strategy parameters: %s", strategy_parameters)
 
     FiveMinORBStrat.spread_buffer_pips = strategy_parameters["spread_buffer_pips"]
     FiveMinORBStrat.tp1_multiplier = strategy_parameters["tp1_multiplier"]
@@ -248,11 +260,13 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
     _strategy_parameters = strategy_parameters
 
     t_final = _time.time()
-    print("[ORB backtest] Running final backtest with best params...")
+    logger.debug("[ORB backtest] Running final backtest with best params...")
     bt_best = Backtest(dftest, FiveMinORBStrat, cash=cash, margin=margin, finalize_trades=True)
     stats = bt_best.run()
     trades_actions = bt_best._strategy.trades_actions
-    print(f"[ORB backtest] Final run done in {_time.time() - t_final:.1f}s — trades: {stats['# Trades']}, actions: {len(trades_actions)}")
-    print(f"[ORB backtest] Total backtest time: {_time.time() - t_start:.1f}s")
+    logger.debug(
+        "[ORB backtest] Final run done in %.1fs — trades: %s, actions: %d | total: %.1fs",
+        _time.time() - t_final, stats['# Trades'], len(trades_actions), _time.time() - t_start,
+    )
 
     return bt_best, stats, trades_actions, strategy_parameters

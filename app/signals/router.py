@@ -31,7 +31,6 @@ async def get_signals(
     username: Annotated[str, Depends(get_current_username)],
     params: SignalRequestDTO = Depends(),
 ) -> SignalResponseDTO:
-    print("RUNNING IN FASTAPI")
     data = await service.get_signals(
         ticker=params.ticker,
         interval=params.interval,
