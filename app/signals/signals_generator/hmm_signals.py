@@ -99,10 +99,10 @@ def calculate_hmm_regime(
     # Smooth with EMA
     mom_smooth = ta.ema(mom_raw, length=length)
 
-    # Standardize: (value - mean) / std
+    # Standardize: (value - mean) / std; NaN where std == 0 (then filled to 0)
     mom_std = ta.stdev(mom_smooth, length=length)
     mom_mean = ta.sma(mom_smooth, length=length)
-    df['obs_momentum'] = (mom_std != 0).astype(float) * ((mom_smooth - mom_mean) / mom_std)
+    df['obs_momentum'] = np.where(mom_std != 0, (mom_smooth - mom_mean) / mom_std, np.nan)
     df['obs_momentum'] = df['obs_momentum'].fillna(0.0)
 
     # ==========================================
@@ -111,10 +111,10 @@ def calculate_hmm_regime(
     # Calculate ATR
     vol_raw = ta.atr(df['High'], df['Low'], df['Close'], length=length)
 
-    # Standardize
+    # Standardize; NaN where std == 0 (then filled to 0)
     vol_std = ta.stdev(vol_raw, length=length)
     vol_mean = ta.sma(vol_raw, length=length)
-    df['obs_volatility'] = (vol_std != 0).astype(float) * ((vol_raw - vol_mean) / vol_std)
+    df['obs_volatility'] = np.where(vol_std != 0, (vol_raw - vol_mean) / vol_std, np.nan)
     df['obs_volatility'] = df['obs_volatility'].fillna(0.0)
 
     # ==========================================
