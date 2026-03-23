@@ -65,7 +65,12 @@ For each time step:
 
 ### Transition Matrix
 
-Regime transition probabilities (configurable):
+Only the **diagonal (persistence) probabilities** are configurable via the API (`p_stay_bull`, `p_stay_bear`, `p_stay_chop`). The off-diagonal ratios are fixed in code:
+- Bull→Bear: 20% of outflow; Bull→Chop: 80% of outflow
+- Bear→Bull: 20% of outflow; Bear→Chop: 80% of outflow
+- Chop→Bull: 50% of outflow; Chop→Bear: 50% of outflow
+
+Default transition matrix (with default persistence values):
 
 | From \ To | Bull | Bear | Chop |
 |-----------|------|------|------|
@@ -73,7 +78,7 @@ Regime transition probabilities (configurable):
 | **Bear** | 4% | 80% | 16% |
 | **Chop** | 20% | 20% | 60% |
 
-*Remaining probability distributed proportionally (e.g., 1-0.80=0.20, with 0.20×0.2=0.04 to other states)*
+*Example: with `p_stay_bull=0.80`, the remaining 20% outflow splits as 0.20×0.2=4% to Bear and 0.20×0.8=16% to Chop.*
 
 ## API Endpoint
 
