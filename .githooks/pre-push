@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Pre-push hook: run tests before pushing
+set -e
+
+echo "Running tests before push..."
+
+if command -v uv &> /dev/null; then
+    uv run pytest -m "not integration" --tb=short -q
+else
+    pytest -m "not integration" --tb=short -q
+fi
+
+echo "All tests passed. Proceeding with push."
