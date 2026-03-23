@@ -99,11 +99,10 @@ def calculate_hmm_regime(
     # Smooth with EMA
     mom_smooth = ta.ema(mom_raw, length=length)
 
-    # Standardize: (value - mean) / std; NaN where std == 0 (then filled to 0)
+    # Standardize: (value - mean) / std; NaN where std == 0 or during warm-up
     mom_std = ta.stdev(mom_smooth, length=length)
     mom_mean = ta.sma(mom_smooth, length=length)
     df['obs_momentum'] = np.where(mom_std != 0, (mom_smooth - mom_mean) / mom_std, np.nan)
-    df['obs_momentum'] = df['obs_momentum'].fillna(0.0)
 
     # ==========================================
     # Observable 2: Volatility
@@ -111,11 +110,16 @@ def calculate_hmm_regime(
     # Calculate ATR
     vol_raw = ta.atr(df['High'], df['Low'], df['Close'], length=length)
 
-    # Standardize; NaN where std == 0 (then filled to 0)
+    # Standardize; NaN where std == 0 or during warm-up
     vol_std = ta.stdev(vol_raw, length=length)
     vol_mean = ta.sma(vol_raw, length=length)
     df['obs_volatility'] = np.where(vol_std != 0, (vol_raw - vol_mean) / vol_std, np.nan)
-    df['obs_volatility'] = df['obs_volatility'].fillna(0.0)
+
+    # Drop warm-up rows where indicators couldn't be computed (avoids biasing
+    # the HMM with artificial zeros during the look-back initialisation period)
+    df = df.dropna(subset=['obs_momentum', 'obs_volatility']).copy()
+    if len(df) == 0:
+        raise ValueError("Insufficient data after removing warmup period")
 
     # ==========================================
     # Calculate Likelihoods for Each Regime

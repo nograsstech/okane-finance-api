@@ -158,8 +158,10 @@ class TestCalculateHMMRegime:
             p_stay_chop=0.70,
         )
 
-        # Should complete without error
-        assert len(result) == len(sample_ohlcv_data)
+        # Should complete without error; warm-up rows are dropped so result
+        # is shorter than the original input
+        assert len(result) > 0
+        assert len(result) <= len(sample_ohlcv_data)
 
     def test_observables_are_standardized(self, sample_ohlcv_data):
         """Observables should be roughly standardized (mean near 0, std near 1)."""
