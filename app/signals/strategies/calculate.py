@@ -15,9 +15,8 @@ from .mean_reversion_trend_filter.mean_reversion_trend_filter_signals import mea
 import importlib
 _five_min_orb_signals = importlib.import_module("app.signals.strategies.5_min_orb.five_min_orb_signals")
 five_min_orb_signals = _five_min_orb_signals.five_min_orb_signals
-# TODO: Uncomment when 5_min_orb_confirmation module is implemented
-# _five_min_orb_confirmation_signals = importlib.import_module("app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_signals")
-# five_min_orb_confirmation_signals = _five_min_orb_confirmation_signals.five_min_orb_confirmation_signals
+_five_min_orb_confirmation_signals = importlib.import_module("app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_signals")
+five_min_orb_confirmation_signals = _five_min_orb_confirmation_signals.five_min_orb_confirmation_signals
 
 def calculate_signals(df, df1d, strategy, parameters):
     print(strategy, parameters)
@@ -52,9 +51,8 @@ def calculate_signals(df, df1d, strategy, parameters):
         return mean_reversion_trend_filter_signals(df, df_4h, params)
       elif strategy == "5_min_orb":
           return five_min_orb_signals(df, parameters)
-      # TODO: Uncomment when 5_min_orb_confirmation module is implemented
-      # elif strategy == "5_min_orb_confirmation":
-      #     return five_min_orb_confirmation_signals(df, parameters)
+      elif strategy == "5_min_orb_confirmation":
+          return five_min_orb_confirmation_signals(df, parameters)
       else:
           return None
     except Exception as e:
@@ -95,8 +93,7 @@ async def calculate_signals_async(df, df1d, strategy, parameters):
       return mean_reversion_trend_filter_signals(df, df_4h, params)
   elif strategy == "5_min_orb":
       return five_min_orb_signals(df, parameters)
-  # TODO: Uncomment when 5_min_orb_confirmation module is implemented
-  # elif strategy == "5_min_orb_confirmation":
-  #     return five_min_orb_confirmation_signals(df, parameters)
+  elif strategy == "5_min_orb_confirmation":
+      return five_min_orb_confirmation_signals(df, parameters)
   else:
       return None

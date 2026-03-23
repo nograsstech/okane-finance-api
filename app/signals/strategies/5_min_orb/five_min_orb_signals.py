@@ -13,10 +13,13 @@ Version A: Immediate breakout entry
 """
 
 import importlib
+import logging
 from datetime import time, timezone
 from typing import Any, Dict, Optional
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # Import from module with numeric name using importlib
 orb_utils = importlib.import_module("app.signals.strategies.5_min_orb.orb_utils")
@@ -58,11 +61,7 @@ def five_min_orb_signals(
         - Pip_Value: Pip value for instrument
         - TotalSignal: 0=None, 1=Sell, 2=Buy
     """
-    import sys
-    print("=== five_min_orb_signals called ===", file=sys.stderr)
-    print(f"DataFrame shape: {df.shape}", file=sys.stderr)
-    print(f"Parameters: {parameters}", file=sys.stderr)
-    sys.stderr.flush()
+    logger.debug("five_min_orb_signals called: shape=%s parameters=%s", df.shape, parameters)
 
     # Set default parameters
     if parameters is None:
@@ -130,10 +129,10 @@ def five_min_orb_signals(
     else:
         sessions = [sessions_to_process]
 
-    print(f"Processing sessions: {sessions}", file=sys.stderr)
-    print(f"Date range: {df.index[0]} to {df.index[-1]}", file=sys.stderr)
-    print(f"Sample times (first 3 candles): {df.index[0].time()}, {df.index[1].time()}, {df.index[2].time()}", file=sys.stderr)
-    sys.stderr.flush()
+    logger.debug(
+        "Processing sessions=%s | date range: %s to %s",
+        sessions, df.index[0], df.index[-1],
+    )
 
     # Cutoff times in local time
     cutoff_times = {
@@ -213,9 +212,9 @@ def five_min_orb_signals(
         # Detect session window
         window = detect_session_window(idx, session)
 
-        # Debug: Log first few candles
+        # Log first few candles for debugging
         if sessions_detected < 5:
-            print(f"  Candle: {idx} timezone.utc -> {local_time} {session} | Window: {window}", file=sys.stderr)
+            logger.debug("Candle: %s UTC -> %s %s | Window: %s", idx, local_time, session, window)
 
         if window == 'open':
             # This is the open candle (08:00 London or 09:30 NY)
@@ -331,9 +330,10 @@ def five_min_orb_signals(
                     signals_scheduled += 1
                     pending_signals[session_key] = {'signal_type': SIGNAL_SELL, 'timestamp': idx}
 
-    # Debug output
-    print(f"5_min_orb signals: sessions={sessions_detected}, ORs formed={ors_formed}, ORs skipped={ors_skipped}, breakouts={breakouts_detected}, signals={signals_scheduled}", file=sys.stderr)
-    print(f"Total non-zero signals: {(df['TotalSignal'] != 0).sum()}", file=sys.stderr)
-    sys.stderr.flush()
+    logger.debug(
+        "5_min_orb signals: sessions=%d, ORs formed=%d, ORs skipped=%d, breakouts=%d, signals=%d | total non-zero: %d",
+        sessions_detected, ors_formed, ors_skipped, breakouts_detected, signals_scheduled,
+        (df['TotalSignal'] != 0).sum(),
+    )
 
     return df
