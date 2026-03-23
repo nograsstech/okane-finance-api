@@ -4,12 +4,16 @@ Service layer for HMM Market Regime Analysis.
 Handles business logic for fetching market data and calculating HMM regime probabilities.
 """
 
-from datetime import datetime
 from starlette.status import HTTP_200_OK
+
+# Confidence level thresholds (0-100 probability scale)
+_CONFIDENCE_HIGH = 70.0
+_CONFIDENCE_MEDIUM = 50.0
 
 from app.signals.signals_generator.hmm_signals import calculate_hmm_regime
 from app.signals.utils.yfinance import getYFinanceDataAsync
 from app.signals.hmm_dto import (
+    DominantRegime,
     HMMRegimeDataPoint,
     HMMRegimeSummary,
     HMMResponseDTO,
@@ -61,7 +65,7 @@ async def get_hmm_regime_data(
             end=end,
         )
     except Exception as e:
-        raise ValueError(f"Failed to fetch data for {ticker}: {e}")
+        raise ValueError(f"Failed to fetch data for {ticker}: {e}") from e
 
     if df is None or len(df) == 0:
         raise ValueError(f"No data available for ticker {ticker} with given parameters")
@@ -76,7 +80,7 @@ async def get_hmm_regime_data(
             p_stay_chop=p_stay_chop,
         )
     except Exception as e:
-        raise ValueError(f"HMM calculation failed: {e}")
+        raise ValueError(f"HMM calculation failed: {e}") from e
 
     # Convert DataFrame to list of data points
     regime_data = []
@@ -96,24 +100,27 @@ async def get_hmm_regime_data(
             )
         )
 
+    if not regime_data:
+        raise ValueError(f"No regime data points produced for {ticker}")
+
     # Get latest (last) data point for summary
     latest = regime_data[-1]
 
     # Determine confidence level
-    if latest.confidence_score > 70:
+    if latest.confidence_score > _CONFIDENCE_HIGH:
         confidence_level = "HIGH"
-    elif latest.confidence_score > 50:
+    elif latest.confidence_score > _CONFIDENCE_MEDIUM:
         confidence_level = "MEDIUM"
     else:
         confidence_level = "LOW"
 
     # Determine recommended strategy
     strategy_map = {
-        'bull': 'Trend Following (Long)',
-        'bear': 'Trend Following (Short)',
-        'chop': 'Mean Reversion or Stay Out',
+        DominantRegime.BULL: 'Trend Following (Long)',
+        DominantRegime.BEAR: 'Trend Following (Short)',
+        DominantRegime.CHOP: 'Mean Reversion or Stay Out',
     }
-    recommended_strategy = strategy_map.get(latest.dominant_regime, 'Unknown')
+    recommended_strategy = strategy_map[latest.dominant_regime]
 
     # Create summary
     summary = HMMRegimeSummary(

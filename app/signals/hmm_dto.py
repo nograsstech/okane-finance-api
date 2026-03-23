@@ -2,7 +2,15 @@
 Data Transfer Objects (DTOs) for HMM Market Regime Analysis API.
 """
 
+from enum import Enum
+
 from pydantic import BaseModel, Field
+
+
+class DominantRegime(str, Enum):
+    BULL = "bull"
+    BEAR = "bear"
+    CHOP = "chop"
 
 
 class HMMRequestDTO(BaseModel):
@@ -54,7 +62,7 @@ class HMMRegimeDataPoint(BaseModel):
     prob_bull: float = Field(..., ge=0, le=100, description="Bull regime probability (0-100)")
     prob_bear: float = Field(..., ge=0, le=100, description="Bear regime probability (0-100)")
     prob_chop: float = Field(..., ge=0, le=100, description="Chop regime probability (0-100)")
-    dominant_regime: str = Field(..., description="Dominant regime: 'bull', 'bear', or 'chop'")
+    dominant_regime: DominantRegime = Field(..., description="Dominant regime")
     confidence_score: float = Field(..., ge=0, le=100, description="Confidence score (max probability)")
     regime_state: int = Field(..., description="Regime state: 1 (bull), -1 (bear), 0 (chop)")
 
@@ -62,7 +70,7 @@ class HMMRegimeDataPoint(BaseModel):
 class HMMRegimeSummary(BaseModel):
     """Summary of current/latest regime state."""
 
-    current_regime: str = Field(..., description="Current dominant regime")
+    current_regime: DominantRegime = Field(..., description="Current dominant regime")
     current_state: int = Field(..., description="Current regime state code")
     confidence: str = Field(..., description="Confidence level: 'HIGH', 'MEDIUM', or 'LOW'")
     confidence_score: float = Field(..., description="Current confidence score")
