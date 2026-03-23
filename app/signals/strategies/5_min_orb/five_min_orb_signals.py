@@ -132,7 +132,8 @@ def five_min_orb_signals(
 
     print(f"Processing sessions: {sessions}", file=sys.stderr)
     print(f"Date range: {df.index[0]} to {df.index[-1]}", file=sys.stderr)
-    print(f"Sample times (first 3 candles): {df.index[0].time()}, {df.index[1].time()}, {df.index[2].time()}", file=sys.stderr)
+    sample_times = ", ".join(str(df.index[i].time()) for i in range(min(3, len(df))))
+    print(f"Sample times (first {min(3, len(df))} candles): {sample_times}", file=sys.stderr)
     sys.stderr.flush()
 
     # Cutoff times in local time
