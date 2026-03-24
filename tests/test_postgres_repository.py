@@ -9,6 +9,8 @@ supply UUIDs explicitly.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from app.db.repository import (
@@ -47,11 +49,9 @@ def _trade_action_payload(backtest_id: int, dt: str = "2024-01-01T00:00:00") -> 
     return {
         "id": _trade_id_counter,
         "backtest_id": backtest_id,
-        "datetime": dt,
+        "datetime": datetime.fromisoformat(dt),
         "trade_action": "buy",
         "price": 150.0,
-        "pnl": 5.0,
-        "return_pct": 3.3,
     }
 
 
@@ -86,8 +86,13 @@ class TestBacktestStatRepository:
 
         updated = await repo.upsert(_backtest_payload(ticker="NVDA", sharpe_ratio=2.5))
         assert updated is not None
-        assert updated.sharpe_ratio == 2.5
         assert updated.id == stat.id
+
+        # upsert on the update path returns a slim SimpleNamespace(id, notifications_on).
+        # Verify the actual column value was persisted by fetching the record.
+        fetched = await repo.get_by_id(stat.id)
+        assert fetched is not None
+        assert fetched.sharpe_ratio == 2.5
 
     async def test_insert_multiple_records(self, db_session):
         repo = BacktestStatRepository(db_session)
@@ -134,7 +139,7 @@ class TestTradeActionRepository:
 
         latest = await ta_repo.get_latest_for_strategy(stat_id)
         assert latest is not None
-        assert latest.datetime == "2024-03-01T00:00:00"
+        assert latest.datetime == datetime.fromisoformat("2024-03-01T00:00:00")
 
     async def test_get_latest_for_strategy_returns_none_when_empty(self, db_session):
         repo = TradeActionRepository(db_session)
