@@ -19,6 +19,126 @@ if mp.get_start_method(allow_none=True) != 'fork':
     mp.set_start_method('fork', force=True)
 
 
+class FiveMinORBStrat(Strategy):
+    """
+    5-Minute ORB Strategy with immediate breakout entry.
+
+    This class is defined at module level to be picklable for multiprocessing.
+    Indicator data is passed via class variables set before backtest execution.
+    """
+
+    # Default values (will be overridden before backtest)
+    mysize = 0.03
+    spread_buffer_pips = 2
+    tp1_multiplier = 1.0
+    tp2_multiplier = 2.0
+    pip_value = 1.0
+    record_trades = False
+    trades_actions = []
+
+    # Class variables to hold indicator data (set before backtest)
+    _signal_data = None
+    _or_high_data = None
+    _or_low_data = None
+    _or_size_pips_data = None
+
+    def init(self):
+        super().init()
+        # Use class-level data if available, otherwise use indicator wrapper
+        if self._signal_data is not None:
+            self.signal1 = self.I(lambda: self._signal_data)
+        if self._or_high_data is not None:
+            self.or_high = self.I(lambda: self._or_high_data)
+        if self._or_low_data is not None:
+            self.or_low = self.I(lambda: self._or_low_data)
+        if self._or_size_pips_data is not None:
+            self.or_size_pips = self.I(lambda: self._or_size_pips_data)
+
+    def next(self):
+        super().next()
+
+        # Get current values
+        or_high = self.or_high[-1]
+        or_low = self.or_low[-1]
+        or_size_pips = self.or_size_pips[-1]
+        pip_value = self.__class__.pip_value
+
+        # Skip if OR data is not available
+        if or_high is None or or_low is None or or_size_pips is None:
+            return
+
+        # Check for NaN values
+        if np.isnan(or_high) or np.isnan(or_low) or np.isnan(or_size_pips):
+            return
+
+        # Entry conditions
+        current_price = self.data.Close[-1]
+
+        if self.signal1 == 2 and len(self.trades) == 0:
+            # Long entry
+            sl_price = or_low - (self.spread_buffer_pips * pip_value)
+            tp1_price = or_high + (or_size_pips * pip_value * self.tp1_multiplier)
+            tp2_price = or_high + (or_size_pips * pip_value * self.tp2_multiplier)
+
+            # Validate: SL < entry < TP (skip if price already past TP)
+            if sl_price >= current_price or tp1_price <= current_price:
+                return
+
+            # Enter with 50% position at each TP level
+            size1 = self.mysize * 0.5
+            size2 = self.mysize * 0.5
+
+            # Enter first half with TP1
+            self.buy(sl=sl_price, tp=tp1_price, size=size1)
+
+            # Enter second half with TP2 (only if TP2 is also valid)
+            if tp2_price > current_price:
+                self.buy(sl=sl_price, tp=tp2_price, size=size2)
+
+            if self.__class__.record_trades:
+                self.__class__.trades_actions.append({
+                    "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                    "trade_action": "buy",
+                    "entry_price": current_price,
+                    "price": current_price,
+                    "sl": sl_price,
+                    "tp": tp1_price,  # Store primary TP as numeric value
+                    "size": self.mysize,
+                })
+
+        elif self.signal1 == 1 and len(self.trades) == 0:
+            # Short entry
+            sl_price = or_high + (self.spread_buffer_pips * pip_value)
+            tp1_price = or_low - (or_size_pips * pip_value * self.tp1_multiplier)
+            tp2_price = or_low - (or_size_pips * pip_value * self.tp2_multiplier)
+
+            # Validate: TP < entry < SL (skip if price already past TP)
+            if sl_price <= current_price or tp1_price >= current_price:
+                return
+
+            # Enter with 50% position at each TP level
+            size1 = self.mysize * 0.5
+            size2 = self.mysize * 0.5
+
+            # Enter first half with TP1
+            self.sell(sl=sl_price, tp=tp1_price, size=size1)
+
+            # Enter second half with TP2 (only if TP2 is also valid)
+            if tp2_price < current_price:
+                self.sell(sl=sl_price, tp=tp2_price, size=size2)
+
+            if self.__class__.record_trades:
+                self.__class__.trades_actions.append({
+                    "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                    "trade_action": "sell",
+                    "entry_price": current_price,
+                    "price": current_price,
+                    "sl": sl_price,
+                    "tp": tp1_price,  # Store primary TP as numeric value
+                    "size": self.mysize,
+                })
+
+
 def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_params=None):
     """
     Run backtest for the 5-Minute ORB strategy (Version A).
@@ -41,7 +161,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 
 
 def _run_backtest(df, strategy_parameters, size, skip_optimization, best_params):
-    """Run backtest using closure-bound indicator functions (no module-level globals)."""
+    """Run backtest using module-level strategy class."""
     import time as _time
 
     t_start = _time.time()
@@ -58,134 +178,23 @@ def _run_backtest(df, strategy_parameters, size, skip_optimization, best_params)
     # Resolve pip value once (scalar) so it can be stored as a class attribute
     pip_val = dftest.Pip_Value.iloc[0] if hasattr(dftest.Pip_Value, 'iloc') else dftest.Pip_Value
 
-    # Create indicator functions as closures over dftest — no module-level
-    # globals needed, so concurrent backtest calls don't share state.
-    def _signal():
-        return dftest.TotalSignal
-
-    def _or_high():
-        return dftest.OR_High
-
-    def _or_low():
-        return dftest.OR_Low
-
-    def _or_size_pips():
-        return dftest.OR_Size_Pips
-
-    # Build a fresh Strategy subclass for this invocation so that class-level
-    # mutable attributes (trades_actions, optimisation params) are not shared
-    # across concurrent calls.
-    class FiveMinORBStrat(Strategy):
-        """5-Minute ORB Strategy with immediate breakout entry."""
-
-        mysize = size
-        spread_buffer_pips = params.get('spread_buffer_pips', 2)
-        tp1_multiplier = params.get('tp1_multiplier', 1.0)
-        tp2_multiplier = params.get('tp2_multiplier', 2.0)
-        pip_value = pip_val
-        record_trades = False
-        trades_actions = []
-
-        def init(self):
-            super().init()
-            self.signal1 = self.I(_signal)
-            self.or_high = self.I(_or_high)
-            self.or_low = self.I(_or_low)
-            self.or_size_pips = self.I(_or_size_pips)
-
-        def next(self):
-            super().next()
-
-            # Get current values
-            or_high = self.or_high[-1]
-            or_low = self.or_low[-1]
-            or_size_pips = self.or_size_pips[-1]
-            pip_value = self.__class__.pip_value
-
-            # Skip if OR data is not available
-            if or_high is None or or_low is None or or_size_pips is None:
-                return
-
-            # Check for NaN values
-            if np.isnan(or_high) or np.isnan(or_low) or np.isnan(or_size_pips):
-                return
-
-            # Entry conditions
-            current_price = self.data.Close[-1]
-
-            if self.signal1 == 2 and len(self.trades) == 0:
-                # Long entry
-                sl_price = or_low - (self.spread_buffer_pips * pip_value)
-                tp1_price = or_high + (or_size_pips * pip_value * self.tp1_multiplier)
-                tp2_price = or_high + (or_size_pips * pip_value * self.tp2_multiplier)
-
-                # Validate: SL < entry < TP (skip if price already past TP)
-                if sl_price >= current_price or tp1_price <= current_price:
-                    return
-
-                # Enter with 50% position at each TP level
-                size1 = self.mysize * 0.5
-                size2 = self.mysize * 0.5
-
-                # Enter first half with TP1
-                self.buy(sl=sl_price, tp=tp1_price, size=size1)
-
-                # Enter second half with TP2 (only if TP2 is also valid)
-                if tp2_price > current_price:
-                    self.buy(sl=sl_price, tp=tp2_price, size=size2)
-
-                if self.__class__.record_trades:
-                    self.__class__.trades_actions.append({
-                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
-                        "trade_action": "buy",
-                        "entry_price": current_price,
-                        "price": current_price,
-                        "sl": sl_price,
-                        "tp": f"TP1: {tp1_price}, TP2: {tp2_price}",
-                        "size": self.mysize,
-                    })
-
-            elif self.signal1 == 1 and len(self.trades) == 0:
-                # Short entry
-                sl_price = or_high + (self.spread_buffer_pips * pip_value)
-                tp1_price = or_low - (or_size_pips * pip_value * self.tp1_multiplier)
-                tp2_price = or_low - (or_size_pips * pip_value * self.tp2_multiplier)
-
-                # Validate: TP < entry < SL (skip if price already past TP)
-                if sl_price <= current_price or tp1_price >= current_price:
-                    return
-
-                # Enter with 50% position at each TP level
-                size1 = self.mysize * 0.5
-                size2 = self.mysize * 0.5
-
-                # Enter first half with TP1
-                self.sell(sl=sl_price, tp=tp1_price, size=size1)
-
-                # Enter second half with TP2 (only if TP2 is also valid)
-                if tp2_price < current_price:
-                    self.sell(sl=sl_price, tp=tp2_price, size=size2)
-
-                if self.__class__.record_trades:
-                    self.__class__.trades_actions.append({
-                        "datetime": self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S.%f'),
-                        "trade_action": "sell",
-                        "entry_price": current_price,
-                        "price": current_price,
-                        "sl": sl_price,
-                        "tp": f"TP1: {tp1_price}, TP2: {tp2_price}",
-                        "size": self.mysize,
-                    })
+    # Set indicator data as class variables (module-level class can access these)
+    FiveMinORBStrat._signal_data = dftest.TotalSignal
+    FiveMinORBStrat._or_high_data = dftest.OR_High
+    FiveMinORBStrat._or_low_data = dftest.OR_Low
+    FiveMinORBStrat._or_size_pips_data = dftest.OR_Size_Pips
 
     # Default backtest parameters
     margin = 1/500
     cash = 100000
     lot_size = size
 
+    # Set strategy class attributes
     FiveMinORBStrat.mysize = lot_size
     FiveMinORBStrat.spread_buffer_pips = params.get("spread_buffer_pips", 2)
     FiveMinORBStrat.tp1_multiplier = params.get("tp1_multiplier", 1.0)
     FiveMinORBStrat.tp2_multiplier = params.get("tp2_multiplier", 2.0)
+    FiveMinORBStrat.pip_value = pip_val
     FiveMinORBStrat.trades_actions = []
 
     # Do optimization if skip_optimization is False
@@ -216,12 +225,15 @@ def _run_backtest(df, strategy_parameters, size, skip_optimization, best_params)
         }
         logger.debug("[ORB backtest] Best params: %s", best_params)
     else:
+        defaults = {
+            'spread_buffer_pips': 2,
+            'tp1_multiplier': 1.0,
+            'tp2_multiplier': 2.0
+        }
         if best_params is None:
-            best_params = {
-                'spread_buffer_pips': 2,
-                'tp1_multiplier': 1.0,
-                'tp2_multiplier': 2.0
-            }
+            best_params = defaults
+        else:
+            best_params = {**defaults, **best_params}
         logger.debug("[ORB backtest] Optimization skipped, using params: %s", best_params)
 
     strategy_parameters = {
@@ -248,5 +260,11 @@ def _run_backtest(df, strategy_parameters, size, skip_optimization, best_params)
         "[ORB backtest] Final run done in %.1fs — trades: %s, actions: %d | total: %.1fs",
         _time.time() - t_final, stats['# Trades'], len(trades_actions), _time.time() - t_start,
     )
+
+    # Clean up class variables to avoid state leakage
+    FiveMinORBStrat._signal_data = None
+    FiveMinORBStrat._or_high_data = None
+    FiveMinORBStrat._or_low_data = None
+    FiveMinORBStrat._or_size_pips_data = None
 
     return bt_best, stats, trades_actions, strategy_parameters
