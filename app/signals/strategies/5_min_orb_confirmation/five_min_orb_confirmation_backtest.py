@@ -106,7 +106,7 @@ class FiveMinORBConfirmationStrat(Strategy):
                     "entry_price": self.data.Close[-1],
                     "price": self.data.Close[-1],
                     "sl": sl_price,
-                    "tp": f"TP1: {tp1_price}, TP2: {tp2_price}",
+                    "tp": tp1_price,  # Store primary TP as numeric value
                     "size": self.mysize,
                 })
 
@@ -133,7 +133,7 @@ class FiveMinORBConfirmationStrat(Strategy):
                     "entry_price": self.data.Close[-1],
                     "price": self.data.Close[-1],
                     "sl": sl_price,
-                    "tp": f"TP1: {tp1_price}, TP2: {tp2_price}",
+                    "tp": tp1_price,  # Store primary TP as numeric value
                     "size": self.mysize,
                 })
 
@@ -212,12 +212,15 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
         print(best_params)
     else:
         # Use provided best_params or defaults
+        defaults = {
+            'sl_buffer_pips': 4,
+            'tp1_multiplier': 1.5,
+            'tp2_multiplier': 2.5
+        }
         if best_params is None:
-            best_params = {
-                'sl_buffer_pips': 4,
-                'tp1_multiplier': 1.5,
-                'tp2_multiplier': 2.5
-            }
+            best_params = defaults
+        else:
+            best_params = {**defaults, **best_params}
         print("Optimization is skipped, using params:", best_params)
 
     strategy_parameters = {
