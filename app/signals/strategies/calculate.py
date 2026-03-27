@@ -1,3 +1,5 @@
+import logging
+
 from .clf_bollinger_rsi.clf_bollinger_rsi_15m import clf_bollinger_signals_15m
 from .clf_bollinger_rsi.clf_bollinger_rsi import clf_bollinger_signals
 from .clf_bollinger_rsi.eurjpy_bollinger_rsi_60m import eurjpy_bollinger_rsi_60m
@@ -56,9 +58,8 @@ def calculate_signals(df, df1d, strategy, parameters):
       else:
           return None
     except Exception as e:
-        print("calculate_signals : ERROR__________________")
-        print(e)
-        return None
+        logging.error("calculate_signals failed for strategy=%s: %s", strategy, e, exc_info=True)
+        raise
       
       
 async def calculate_signals_async(df, df1d, strategy, parameters):

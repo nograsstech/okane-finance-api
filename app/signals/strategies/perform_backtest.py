@@ -1,3 +1,8 @@
+import importlib
+import logging
+
+from fastapi import HTTPException
+
 from .ema_bollinger.ema_bollinger_backtest import backtest as ema_bollinger_backtest
 from .ema_bollinger_1_low_risk.ema_bollinger_1_low_risk_backtest import backtest as ema_bollinger_1_low_risk_backtest
 from .macd_1.macd_1_backtest import backtest as macd_1_backtest
@@ -10,8 +15,6 @@ from .forex_fvg_respected.fvg_confirmation_backtest import backtest as fvg_confi
 from .swing_1.swing_backtest import backtest as swing_1_backtest
 from .double_candle.double_candle_backtest import backtest as double_candle_backtest
 from .mean_reversion_trend_filter.mean_reversion_trend_filter_backtest import backtest as mean_reversion_trend_filter_backtest
-import importlib
-from fastapi import HTTPException
 
 # Import ORB strategies using importlib due to numeric module names
 five_min_orb_module = importlib.import_module('app.signals.strategies.5_min_orb.five_min_orb_backtest')
@@ -53,10 +56,8 @@ def perform_backtest(df, strategy, parameters, skip_optimization=False, best_par
         else:
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
-        print("perform_backtest: ERROR__________________")
-        print(e)
-        # Return empty values to avoid unpacking errors in the caller
-        return None, None, [], {}
+        logging.error("perform_backtest failed for strategy=%s: %s", strategy, e, exc_info=True)
+        raise
 
 
 async def perform_backtest_async(df, strategy, parameters):
