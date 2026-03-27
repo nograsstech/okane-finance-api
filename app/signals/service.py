@@ -150,12 +150,24 @@ async def get_backtest_result(
         )
 
     try:
-        bt, stats, trade_actions, strategy_parameters = await asyncio.to_thread(_run_backtest)
+        bt, stats, trade_actions, strategy_parameters = await asyncio.wait_for(
+            asyncio.to_thread(_run_backtest),
+            timeout=600.0,  # 10-minute hard limit; optimization can be slow but not infinite
+        )
         if bt is None or stats is None:
             raise HTTPException(
                 status_code=400,
                 detail="Backtest returned no results (strategy calculation may have failed or no trades were executed).",
             )
+    except asyncio.TimeoutError:
+        logging.error(
+            "Backtest timed out after 600s. ticker=%s strategy=%s interval=%s period=%s",
+            ticker, strategy, interval, period,
+        )
+        raise HTTPException(
+            status_code=408,
+            detail="Backtest timed out after 10 minutes. The strategy optimisation may be stalled — try again or use skip_optimization=true.",
+        )
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
