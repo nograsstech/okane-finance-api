@@ -91,6 +91,7 @@ async def get_hmm_regime_data(
                 close=float(row['Close']),
                 obs_momentum=float(row['obs_momentum']),
                 obs_volatility=float(row['obs_volatility']),
+                obs_rsi=float(row['obs_rsi']),
                 prob_bull=float(row['prob_bull']),
                 prob_bear=float(row['prob_bear']),
                 prob_chop=float(row['prob_chop']),

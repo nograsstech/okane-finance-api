@@ -5,9 +5,9 @@ Based on Pine Script: "Hidden Markov Model: Regime Probability [AlgoPoint]"
 Implements a 3-state HMM (Bull, Bear, Chop) with Bayesian updating.
 
 Regime characteristics:
-- Bull: Positive momentum (μ=1.0, σ=1.0), lower volatility (μ=-0.5, σ=1.0)
-- Bear: Negative momentum (μ=-1.0, σ=1.0), higher volatility (μ=1.0, σ=1.0)
-- Chop: Low momentum (μ=0.0, σ=0.5), high volatility (μ=1.5, σ=1.0)
+- Bull: Positive momentum (μ=1.0, σ=1.5), lower volatility (μ=-0.5, σ=1.0), RSI above median (μ=0.8, σ=1.0)
+- Bear: Negative momentum (μ=-1.0, σ=1.5), higher volatility (μ=1.0, σ=1.0), RSI below median (μ=-0.8, σ=1.0)
+- Chop: Low momentum (μ=0.0, σ=0.5), high volatility (μ=1.5, σ=1.0), RSI near median (μ=0.0, σ=0.8)
 """
 
 import numpy as np
@@ -16,11 +16,11 @@ import pandas_ta as ta
 from typing import Literal
 
 
-# Regime parameters (mean and std for both momentum and volatility)
+# Regime parameters (mean and std for momentum, volatility, and RSI observables)
 REGIME_PARAMS = {
-    'bull': {'mom_mu': 1.0, 'mom_sigma': 1.0, 'vol_mu': -0.5, 'vol_sigma': 1.0},
-    'bear': {'mom_mu': -1.0, 'mom_sigma': 1.0, 'vol_mu': 1.0, 'vol_sigma': 1.0},
-    'chop': {'mom_mu': 0.0, 'mom_sigma': 0.5, 'vol_mu': 1.5, 'vol_sigma': 1.0},
+    'bull': {'mom_mu': 1.0,  'mom_sigma': 1.5, 'vol_mu': -0.5, 'vol_sigma': 1.0, 'rsi_mu':  0.8, 'rsi_sigma': 1.0},
+    'bear': {'mom_mu': -1.0, 'mom_sigma': 1.5, 'vol_mu':  1.0, 'vol_sigma': 1.0, 'rsi_mu': -0.8, 'rsi_sigma': 1.0},
+    'chop': {'mom_mu':  0.0, 'mom_sigma': 0.5, 'vol_mu':  1.5, 'vol_sigma': 1.0, 'rsi_mu':  0.0, 'rsi_sigma': 0.8},
 }
 
 
@@ -47,9 +47,9 @@ def gaussian_pdf(x: float, mu: float, sigma: float) -> float:
 def calculate_hmm_regime(
     df: pd.DataFrame,
     length: int = 20,
-    p_stay_bull: float = 0.80,
-    p_stay_bear: float = 0.80,
-    p_stay_chop: float = 0.60,
+    p_stay_bull: float = 0.75,
+    p_stay_bear: float = 0.75,
+    p_stay_chop: float = 0.55,
 ) -> pd.DataFrame:
     """
     Calculate HMM regime probabilities for market data.
@@ -61,14 +61,15 @@ def calculate_hmm_regime(
     Args:
         df: DataFrame with OHLCV data (must have 'Close', 'High', 'Low' columns)
         length: Lookback period for observable calculations (default: 20)
-        p_stay_bull: Probability of staying in bull regime (default: 0.80)
-        p_stay_bear: Probability of staying in bear regime (default: 0.80)
-        p_stay_chop: Probability of staying in chop regime (default: 0.60)
+        p_stay_bull: Probability of staying in bull regime (default: 0.75)
+        p_stay_bear: Probability of staying in bear regime (default: 0.75)
+        p_stay_chop: Probability of staying in chop regime (default: 0.55)
 
     Returns:
         DataFrame with additional columns:
         - obs_momentum: Standardized momentum observable
         - obs_volatility: Standardized volatility observable
+        - obs_rsi: Standardized RSI observable (centered at 50)
         - prob_bull: Bull regime probability (0-100)
         - prob_bear: Bear regime probability (0-100)
         - prob_chop: Chop regime probability (0-100)
@@ -85,39 +86,54 @@ def calculate_hmm_regime(
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
 
-    if len(df) < length + 1:
-        raise ValueError(f"Insufficient data: need at least {length + 1} rows, got {len(df)}")
+    min_required = max(length, 14) + max(10, length // 2) + 1
+    if len(df) < min_required:
+        raise ValueError(f"Insufficient data: need at least {min_required} rows, got {len(df)}")
 
     df = df.copy()
+
+    # Shared normalization window (shorter than length to reduce lag)
+    norm_window = max(10, length // 2)
 
     # ==========================================
     # Observable 1: Momentum
     # ==========================================
-    # Calculate rate of change
-    mom_raw = ta.roc(df['Close'], length=1)
-
-    # Smooth with EMA
-    mom_smooth = ta.ema(mom_raw, length=length)
+    # Use multi-period ROC directly — inherently smoother than ROC(1)+EMA,
+    # and avoids the ~(length/2)-bar lag that EMA smoothing introduced.
+    roc_length = max(3, length // 4)
+    mom_raw = ta.roc(df['Close'], length=roc_length)
 
     # Standardize: (value - mean) / std; NaN where std == 0 or during warm-up
-    mom_std = ta.stdev(mom_smooth, length=length)
-    mom_mean = ta.sma(mom_smooth, length=length)
-    df['obs_momentum'] = np.where(mom_std != 0, (mom_smooth - mom_mean) / mom_std, np.nan)
+    mom_std = ta.stdev(mom_raw, length=norm_window)
+    mom_mean = ta.sma(mom_raw, length=norm_window)
+    df['obs_momentum'] = np.where(mom_std != 0, (mom_raw - mom_mean) / mom_std, np.nan)
 
     # ==========================================
     # Observable 2: Volatility
     # ==========================================
-    # Calculate ATR
-    vol_raw = ta.atr(df['High'], df['Low'], df['Close'], length=length)
+    # Use shorter ATR period for faster volatility response
+    atr_length = max(5, length // 2)
+    vol_raw = ta.atr(df['High'], df['Low'], df['Close'], length=atr_length)
 
     # Standardize; NaN where std == 0 or during warm-up
-    vol_std = ta.stdev(vol_raw, length=length)
-    vol_mean = ta.sma(vol_raw, length=length)
+    vol_std = ta.stdev(vol_raw, length=norm_window)
+    vol_mean = ta.sma(vol_raw, length=norm_window)
     df['obs_volatility'] = np.where(vol_std != 0, (vol_raw - vol_mean) / vol_std, np.nan)
+
+    # ==========================================
+    # Observable 3: RSI
+    # ==========================================
+    # RSI is a fast bounded oscillator; centering at 50 gives positive values
+    # for bullish conditions and negative for bearish.
+    rsi_raw = ta.rsi(df['Close'], length=14)
+    rsi_centered = rsi_raw - 50.0
+    rsi_std = ta.stdev(rsi_centered, length=norm_window)
+    rsi_mean = ta.sma(rsi_centered, length=norm_window)
+    df['obs_rsi'] = np.where(rsi_std != 0, (rsi_centered - rsi_mean) / rsi_std, np.nan)
 
     # Drop warm-up rows where indicators couldn't be computed (avoids biasing
     # the HMM with artificial zeros during the look-back initialisation period)
-    df = df.dropna(subset=['obs_momentum', 'obs_volatility']).copy()
+    df = df.dropna(subset=['obs_momentum', 'obs_volatility', 'obs_rsi']).copy()
     if len(df) == 0:
         raise ValueError("Insufficient data after removing warmup period")
 
@@ -130,17 +146,20 @@ def calculate_hmm_regime(
 
     df['like_bull'] = (
         gaussian_pdf(df['obs_momentum'], bull_params['mom_mu'], bull_params['mom_sigma']) *
-        gaussian_pdf(df['obs_volatility'], bull_params['vol_mu'], bull_params['vol_sigma'])
+        gaussian_pdf(df['obs_volatility'], bull_params['vol_mu'], bull_params['vol_sigma']) *
+        gaussian_pdf(df['obs_rsi'], bull_params['rsi_mu'], bull_params['rsi_sigma'])
     )
 
     df['like_bear'] = (
         gaussian_pdf(df['obs_momentum'], bear_params['mom_mu'], bear_params['mom_sigma']) *
-        gaussian_pdf(df['obs_volatility'], bear_params['vol_mu'], bear_params['vol_sigma'])
+        gaussian_pdf(df['obs_volatility'], bear_params['vol_mu'], bear_params['vol_sigma']) *
+        gaussian_pdf(df['obs_rsi'], bear_params['rsi_mu'], bear_params['rsi_sigma'])
     )
 
     df['like_chop'] = (
         gaussian_pdf(df['obs_momentum'], chop_params['mom_mu'], chop_params['mom_sigma']) *
-        gaussian_pdf(df['obs_volatility'], chop_params['vol_mu'], chop_params['vol_sigma'])
+        gaussian_pdf(df['obs_volatility'], chop_params['vol_mu'], chop_params['vol_sigma']) *
+        gaussian_pdf(df['obs_rsi'], chop_params['rsi_mu'], chop_params['rsi_sigma'])
     )
 
     # ==========================================

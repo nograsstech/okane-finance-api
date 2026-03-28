@@ -33,19 +33,19 @@ class HMMRequestDTO(BaseModel):
         description="Lookback period for observable calculations",
     )
     p_stay_bull: float = Field(
-        default=0.80,
+        default=0.75,
         ge=0.0,
         le=0.99,
         description="Probability of staying in bull regime",
     )
     p_stay_bear: float = Field(
-        default=0.80,
+        default=0.75,
         ge=0.0,
         le=0.99,
         description="Probability of staying in bear regime",
     )
     p_stay_chop: float = Field(
-        default=0.60,
+        default=0.55,
         ge=0.0,
         le=0.99,
         description="Probability of staying in chop regime",
@@ -59,6 +59,7 @@ class HMMRegimeDataPoint(BaseModel):
     close: float = Field(..., description="Close price")
     obs_momentum: float = Field(..., description="Standardized momentum observable")
     obs_volatility: float = Field(..., description="Standardized volatility observable")
+    obs_rsi: float = Field(..., description="Standardized RSI observable (centered at 50)")
     prob_bull: float = Field(..., ge=0, le=100, description="Bull regime probability (0-100)")
     prob_bear: float = Field(..., ge=0, le=100, description="Bear regime probability (0-100)")
     prob_chop: float = Field(..., ge=0, le=100, description="Chop regime probability (0-100)")
