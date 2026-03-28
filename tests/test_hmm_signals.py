@@ -84,6 +84,7 @@ class TestCalculateHMMRegime:
         expected_cols = [
             'obs_momentum',
             'obs_volatility',
+            'obs_rsi',
             'prob_bull',
             'prob_bear',
             'prob_chop',
@@ -173,6 +174,11 @@ class TestCalculateHMMRegime:
         ).all()
         assert momentum_within_bounds, "Momentum observable outside expected range"
 
+        rsi_within_bounds = (
+            (result['obs_rsi'] > -5) & (result['obs_rsi'] < 5)
+        ).all()
+        assert rsi_within_bounds, "RSI observable outside expected range"
+
     def test_likelihood_columns_exist(self, sample_ohlcv_data):
         """Should calculate likelihood columns for each regime."""
         result = calculate_hmm_regime(sample_ohlcv_data, length=20)
@@ -188,6 +194,13 @@ class TestCalculateHMMRegime:
         assert (result['like_bull'] >= 0).all()
         assert (result['like_bear'] >= 0).all()
         assert (result['like_chop'] >= 0).all()
+
+    def test_rsi_observable_is_finite(self, sample_ohlcv_data):
+        """obs_rsi should be present and contain finite values after warm-up drop."""
+        result = calculate_hmm_regime(sample_ohlcv_data, length=20)
+        assert 'obs_rsi' in result.columns
+        assert result['obs_rsi'].notna().all(), "obs_rsi contains NaN after dropna"
+        assert np.isfinite(result['obs_rsi']).all(), "obs_rsi contains non-finite values"
 
 
 class TestHMMToSignal:
@@ -273,9 +286,12 @@ class TestRegimeParams:
             assert 'mom_sigma' in params
             assert 'vol_mu' in params
             assert 'vol_sigma' in params
+            assert 'rsi_mu' in params
+            assert 'rsi_sigma' in params
 
     def test_positive_standard_deviations(self):
         """All standard deviations should be positive."""
         for regime, params in REGIME_PARAMS.items():
             assert params['mom_sigma'] > 0
             assert params['vol_sigma'] > 0
+            assert params['rsi_sigma'] > 0
