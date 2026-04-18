@@ -35,8 +35,9 @@ class ORBAutoresearchStrat(Strategy):
     sl_narrow_fraction = 0.6667   # SL placed this fraction into range for narrow (2/3)
     tp_multiplier = 1.0           # TP = entry ± range_height * tp_multiplier
 
-    # Fixed runtime attrs
-    mysize = 0.03
+    # Position sizing: risk fixed % of equity per trade
+    risk_per_trade = 0.01      # Risk 1% of equity per trade (playbook: 0.5%–1.0%)
+
     record_trades = False
     trades_actions = []
 
@@ -99,7 +100,13 @@ class ORBAutoresearchStrat(Strategy):
             if sl >= current_price or tp <= current_price:
                 return
 
-            self.buy(sl=sl, tp=tp, size=self.__class__.mysize)
+            sl_distance = abs(current_price - sl)
+            if sl_distance <= 0:
+                return
+            # Risk-based sizing: number of units so SL hit = risk_per_trade % of equity
+            risk_amount = self.equity * self.__class__.risk_per_trade
+            size = max(1, round(risk_amount / sl_distance))
+            self.buy(sl=sl, tp=tp, size=size)
 
             if self.__class__.record_trades:
                 self.__class__.trades_actions.append({
@@ -109,7 +116,7 @@ class ORBAutoresearchStrat(Strategy):
                     "price": current_price,
                     "sl": sl,
                     "tp": tp,
-                    "size": self.__class__.mysize,
+                    "size": size,
                 })
 
         elif signal == 1:
@@ -123,7 +130,12 @@ class ORBAutoresearchStrat(Strategy):
             if sl <= current_price or tp >= current_price:
                 return
 
-            self.sell(sl=sl, tp=tp, size=self.__class__.mysize)
+            sl_distance = abs(current_price - sl)
+            if sl_distance <= 0:
+                return
+            risk_amount = self.equity * self.__class__.risk_per_trade
+            size = max(1, round(risk_amount / sl_distance))
+            self.sell(sl=sl, tp=tp, size=size)
 
             if self.__class__.record_trades:
                 self.__class__.trades_actions.append({
@@ -133,7 +145,7 @@ class ORBAutoresearchStrat(Strategy):
                     "price": current_price,
                     "sl": sl,
                     "tp": tp,
-                    "size": self.__class__.mysize,
+                    "size": size,
                 })
 
 
@@ -186,9 +198,8 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 
     cash = 100_000
     margin = 1 / 500
-    lot_size = size
 
-    ORBAutoresearchStrat.mysize = lot_size
+    ORBAutoresearchStrat.risk_per_trade = params.get("risk_per_trade", 0.01)
     ORBAutoresearchStrat.narrow_threshold = params.get("narrow_threshold", 0.002)
     ORBAutoresearchStrat.sl_narrow_fraction = params.get("sl_narrow_fraction", 0.6667)
     ORBAutoresearchStrat.tp_multiplier = params.get("tp_multiplier", 1.0)
@@ -196,15 +207,15 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 
     if not skip_optimization:
         t_opt = _time.time()
-        logger.debug("[ORB autoresearch backtest] Starting optimization (3×3×3 = 27 combos)...")
+        logger.debug("[ORB autoresearch backtest] Starting optimization (3×3×2 = 18 combos)...")
         bt = Backtest(dftest, ORBAutoresearchStrat, cash=cash, margin=margin, finalize_trades=True)
 
         stats, heatmap = bt.optimize(
             narrow_threshold=[0.0015, 0.002, 0.0025],
             sl_narrow_fraction=[0.5, 0.6667, 0.8],
-            tp_multiplier=[1.0, 1.25, 1.5],
+            tp_multiplier=[1.0, 1.5],
             maximize="Sharpe Ratio",
-            max_tries=27,
+            max_tries=18,
             random_state=0,
             return_heatmap=True,
         )
@@ -231,6 +242,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 
     strategy_parameters = {
         "best": True,
+        "risk_per_trade": ORBAutoresearchStrat.risk_per_trade,
         "narrow_threshold": best_params["narrow_threshold"],
         "sl_narrow_fraction": best_params["sl_narrow_fraction"],
         "tp_multiplier": best_params["tp_multiplier"],
