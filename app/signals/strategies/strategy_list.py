@@ -23,4 +23,7 @@ strategy_list = [
     # 5-Minute ORB Strategies
     "5_min_orb",
     "5_min_orb_confirmation",
+
+    # ORB Autoresearch (30-min range, session-directional filter, narrow/wide classification)
+    "orb_autoresearch",
 ]

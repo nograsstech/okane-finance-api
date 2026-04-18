@@ -3,24 +3,36 @@ import logging
 
 from fastapi import HTTPException
 
-from .ema_bollinger.ema_bollinger_backtest import backtest as ema_bollinger_backtest
-from .ema_bollinger_1_low_risk.ema_bollinger_1_low_risk_backtest import backtest as ema_bollinger_1_low_risk_backtest
-from .macd_1.macd_1_backtest import backtest as macd_1_backtest
 from .clf_bollinger_rsi.clf_bollinger_rsi_backtest import backtest as clf_bollinger_rsi_backtest
-from .clf_bollinger_rsi.clf_bollinger_rsi_backtest_15m import backtest as clf_bollinger_rsi_backtest_15m
-from .clf_bollinger_rsi.eurjpy_bollinger_rsi_60m_backtest import backtest as eurjpy_bollinger_rsi_60m_backtest
-from .grid_trading.grid_trading_backtest import backtest as grid_trading_backtest
-from .super_safe_strategy.super_safe_strategy_backtest import backtest as super_safe_strategy_backtest
-from .forex_fvg_respected.fvg_confirmation_backtest import backtest as fvg_confirmation_backtest
-from .swing_1.swing_backtest import backtest as swing_1_backtest
+from .clf_bollinger_rsi.clf_bollinger_rsi_backtest_15m import (
+    backtest as clf_bollinger_rsi_backtest_15m,
+)
+from .clf_bollinger_rsi.eurjpy_bollinger_rsi_60m_backtest import (
+    backtest as eurjpy_bollinger_rsi_60m_backtest,
+)
 from .double_candle.double_candle_backtest import backtest as double_candle_backtest
-from .mean_reversion_trend_filter.mean_reversion_trend_filter_backtest import backtest as mean_reversion_trend_filter_backtest
+from .ema_bollinger.ema_bollinger_backtest import backtest as ema_bollinger_backtest
+from .ema_bollinger_1_low_risk.ema_bollinger_1_low_risk_backtest import (
+    backtest as ema_bollinger_1_low_risk_backtest,
+)
+from .forex_fvg_respected.fvg_confirmation_backtest import backtest as fvg_confirmation_backtest
+from .grid_trading.grid_trading_backtest import backtest as grid_trading_backtest
+from .macd_1.macd_1_backtest import backtest as macd_1_backtest
+from .mean_reversion_trend_filter.mean_reversion_trend_filter_backtest import (
+    backtest as mean_reversion_trend_filter_backtest,
+)
+from .orb_autoresearch.orb_autoresearch_backtest import backtest as orb_autoresearch_backtest
+from .super_safe_strategy.super_safe_strategy_backtest import (
+    backtest as super_safe_strategy_backtest,
+)
+from .swing_1.swing_backtest import backtest as swing_1_backtest
 
 # Import ORB strategies using importlib due to numeric module names
 five_min_orb_module = importlib.import_module('app.signals.strategies.5_min_orb.five_min_orb_backtest')
 five_min_orb_backtest = five_min_orb_module.backtest
 five_min_orb_confirmation_module = importlib.import_module('app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_backtest')
 five_min_orb_confirmation_backtest = five_min_orb_confirmation_module.backtest
+
 
 def perform_backtest(df, strategy, parameters, skip_optimization=False, best_params=None):
     print(strategy)
@@ -53,6 +65,8 @@ def perform_backtest(df, strategy, parameters, skip_optimization=False, best_par
             return five_min_orb_backtest(df, parameters, parameters.get('size', 0.03), skip_optimization, best_params)
         elif strategy == "5_min_orb_confirmation":
             return five_min_orb_confirmation_backtest(df, parameters, parameters.get('size', 0.03), skip_optimization, best_params)
+        elif strategy == "orb_autoresearch":
+            return orb_autoresearch_backtest(df, parameters, parameters.get('size', 0.03), skip_optimization, best_params)
         else:
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
@@ -90,5 +104,7 @@ async def perform_backtest_async(df, strategy, parameters):
         return five_min_orb_backtest(df, parameters, parameters.get('size', 0.03))
     elif strategy == "5_min_orb_confirmation":
         return five_min_orb_confirmation_backtest(df, parameters, parameters.get('size', 0.03))
+    elif strategy == "orb_autoresearch":
+        return orb_autoresearch_backtest(df, parameters, parameters.get('size', 0.03))
     else:
         raise HTTPException(status_code=404, detail="Not found")
