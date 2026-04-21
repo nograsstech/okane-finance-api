@@ -634,6 +634,27 @@ async def replay_backtest(backtest_id: int):
     }
 
 
+def _build_best_params(strategy):
+    """Map DB columns (tpsl_ratio, sl_coef, tp_coef) to strategy-specific keys."""
+    s = strategy.strategy
+
+    if s == "mean_reversion_trend_filter":
+        return {
+            "slcoef": strategy.sl_coef if strategy.sl_coef is not None else 4.0,
+            "tpratio": strategy.tp_coef if strategy.tp_coef is not None else 3.5,
+        }
+    elif s == "orb_autoresearch":
+        # DB doesn't store orb_autoresearch params yet; return None to use defaults
+        return None
+    else:
+        # Strategies that use tpslRatio / slcoef / TPcoef naming
+        return {
+            "tpslRatio": strategy.tpsl_ratio,
+            "slcoef": strategy.sl_coef,
+            "TPcoef": strategy.tp_coef,
+        }
+
+
 async def strategy_notification_job():
     """
     Fetch all unique strategies and run backtests + send notifications.
@@ -667,6 +688,10 @@ async def strategy_notification_job():
         print("Skip optimization:", time_difference < 3)
 
         try:
+            # Build strategy-specific best_params from DB columns.
+            # Each backtest function expects its own key names, so map accordingly.
+            best_params = _build_best_params(strategy)
+
             await get_backtest_result(
                 ticker=strategy.ticker,
                 interval=strategy.interval,
@@ -678,11 +703,7 @@ async def strategy_notification_job():
                 strategy_id=str(strategy.id) if strategy.id else None,
                 notifications_on=strategy.notifications_on,
                 skip_optimization=time_difference < 3,
-                best_params={
-                    "tpslRatio": strategy.tpsl_ratio,
-                    "slcoef": strategy.sl_coef,
-                    "TPcoef": strategy.tp_coef,
-                },
+                best_params=best_params,
             )
         except Exception as e:
             logging.error("Failed to run backtest for strategy: %s", e)
