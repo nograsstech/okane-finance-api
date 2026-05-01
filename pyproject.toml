@@ -168,6 +168,9 @@ dependencies = [
     "Lazify>=0.4.0",
     "fsspec>=2025.3.0",
 
+    # ── Scheduling ────────────────────────────────────────────────────────────
+    "apscheduler>=3.10.4,<4",
+
     # ── Legacy compatibility ───────────────────────────────────────────────────
     # pkg_resources is required by the vendored pandas_ta wheel. setuptools>=81
     # removed pkg_resources; pinning to <81 restores it.
