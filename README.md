@@ -143,14 +143,23 @@ This platform implements multiple algorithmic trading strategies for forex and o
 
 ### Available Strategies
 
-| Strategy | Description | Timeframe | Instruments |
-|----------|-------------|-----------|-------------|
-| `ema_bollinger` | EMA + Bollinger Bands crossover | Multiple | Forex, Stocks |
-| `macd_1` | MACD-based signals | Multiple | Forex, Stocks |
-| `clf_bollinger_rsi` | Classifier with Bollinger + RSI | 15m | Forex |
-| `grid_trading` | Grid trading strategy | Multiple | Forex |
-| `super_safe_strategy` | Conservative approach | Multiple | Forex |
-| `fvg_confirmation` | Fair Value Gap confirmation | Multiple | Forex |
+| Strategy | Description | Timeframe | Best For |
+|----------|-------------|-----------|----------|
+| `ema_bollinger` | EMA + Bollinger Bands crossover with RSI confirmation | Multiple | Forex, Stocks |
+| `ema_bollinger_1_low_risk` | Lower risk variant of EMA Bollinger strategy | Multiple | Risk-averse trading |
+| `macd_1` | MACD-based signals with multi-timeframe analysis | Multiple | Forex, Stocks, Trend-following |
+| `clf_bollinger_rsi` | Classifier with Bollinger Bands + RSI | Multiple | Crude Oil Futures |
+| `clf_bollinger_rsi_15m` | 15-minute variant of Bollinger + RSI classifier | 15m | Short-term trading |
+| `eurjpy_bollinger_rsi_60m` | EUR/JPY specific Bollinger + RSI strategy | 60m | EUR/JPY Forex |
+| `grid_trading` | Grid trading with ATR-based levels | Multiple | Ranging markets |
+| `super_safe_strategy` | Conservative multi-indicator approach (EMAs, BB, RSI, ADX, Volume) | Multiple | Conservative Forex |
+| `fvg_confirmation` | Fair Value Gap confirmation with 200 EMA trend filter | Multiple | Forex |
+| `swing-1` | Support/Resistance with candlestick pattern confirmation | Multiple | Swing trading |
+| `double_candle` | Consecutive candle pattern with volatility-adjusted sizing | Multiple | Trend continuation |
+| `mean_reversion_trend_filter` | Mean reversion with 4H trend filter and candle patterns | Multiple | Trend pullbacks |
+| `5_min_orb` | 5-min Opening Range Breakout — immediate entry | 5m | Forex (London/NY sessions) |
+| `5_min_orb_confirmation` | 5-min ORB with retest confirmation | 5m | Forex (London/NY sessions) |
+| `orb_autoresearch` | 30-min ORB with session-directional filter and narrow/wide classification | 30m | Forex (London/NY sessions) |
 
 ---
 
