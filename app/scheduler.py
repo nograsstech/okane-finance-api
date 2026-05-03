@@ -2,8 +2,12 @@
 Backtest notification scheduler.
 
 Runs strategy_notification_job on a session-aware schedule:
-  - Every 5 min during London open  (Mon–Fri 07:00–10:00 UTC)
-  - Every 5 min during NY open      (Mon–Fri 13:30–16:30 UTC)
+  - Every 5 min during London open  (Mon–Fri 07:00–09:55 UTC)
+  - Every 5 min during NY open      (Mon–Fri 09:30–12:30 America/New_York)
+
+NY jobs use the America/New_York timezone so the schedule automatically
+adjusts for EDT (UTC-4, ~Mar–Nov) and EST (UTC-5, ~Nov–Mar) without any
+manual intervention.
 
 Multiple APScheduler jobs with non-overlapping cron windows cover each
 session exactly, using max_instances=1 and coalesce=True so a slow run
@@ -43,30 +47,43 @@ def _add_london_open_jobs(scheduler: AsyncIOScheduler) -> None:
 
 
 def _add_ny_open_jobs(scheduler: AsyncIOScheduler) -> None:
-    """Every 5 min Mon–Fri 13:30–16:30 UTC (New York opening session)."""
-    # 13:30 – 13:55
+    """Every 5 min Mon–Fri 09:30–12:30 America/New_York (New York opening session).
+
+    America/New_York timezone handles DST automatically:
+      EDT (UTC-4, ~Mar–Nov): 09:30 NY = 13:30 UTC
+      EST (UTC-5, ~Nov–Mar): 09:30 NY = 14:30 UTC
+    """
+    # 09:30 – 09:55 NY
     scheduler.add_job(
         _run_notification_job,
         CronTrigger(
-            day_of_week="mon-fri", hour="13", minute="30,35,40,45,50,55", timezone="UTC"
+            day_of_week="mon-fri",
+            hour="9",
+            minute="30,35,40,45,50,55",
+            timezone="America/New_York",
         ),
         id="notify_ny_open",
         max_instances=1,
         coalesce=True,
     )
-    # 14:00 – 15:55
+    # 10:00 – 11:55 NY
     scheduler.add_job(
         _run_notification_job,
-        CronTrigger(day_of_week="mon-fri", hour="14-15", minute="*/5", timezone="UTC"),
+        CronTrigger(
+            day_of_week="mon-fri", hour="10-11", minute="*/5", timezone="America/New_York"
+        ),
         id="notify_ny_mid",
         max_instances=1,
         coalesce=True,
     )
-    # 16:00 – 16:30
+    # 12:00 – 12:30 NY
     scheduler.add_job(
         _run_notification_job,
         CronTrigger(
-            day_of_week="mon-fri", hour="16", minute="0,5,10,15,20,25,30", timezone="UTC"
+            day_of_week="mon-fri",
+            hour="12",
+            minute="0,5,10,15,20,25,30",
+            timezone="America/New_York",
         ),
         id="notify_ny_close",
         max_instances=1,
