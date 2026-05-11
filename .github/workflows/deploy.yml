@@ -24,23 +24,23 @@ jobs:
             cd ~/projects/okane/okane-finance-api
 
             # Pull latest code
-            git checkout main
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             # Create backup
             mkdir -p backups
             cp .env backups/.env.$(date +%Y%m%d_%H%M%S)
 
             # Stop and remove existing containers
-            docker-compose down
-
+            docker compose down
+            
             # Rebuild and start
-            docker-compose build --no-cache
-            docker-compose up -d
+            docker compose build --no-cache
+            docker compose up -d
 
             # Show initial logs for debugging
             echo "=== Container logs ==="
-            docker-compose logs --tail=50
+            docker compose logs --tail=50
 
             # Health check - retry until ready (max 30s)
             timeout=30
@@ -55,5 +55,5 @@ jobs:
             done
 
             echo "Health check failed after ${timeout}s"
-            docker-compose down
+            docker compose down
             exit 1
