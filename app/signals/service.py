@@ -9,6 +9,8 @@ import zlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
+from app.signals.constants import STRATEGY_DESCRIPTIONS
+
 from fastapi import HTTPException
 from starlette.status import HTTP_200_OK
 
@@ -715,6 +717,9 @@ async def _get_all_strategies():
         return await UniqueStrategyRepository(session).get_all()
 
 
+logger = logging.getLogger(__name__)
+
+
 async def get_strategies():
     """
     Get the list of available trading strategies.
@@ -727,15 +732,16 @@ async def get_strategies():
 
     strategies = []
     for strategy_id in strategy_list:
-        # Convert strategy_id to a display name (capitalize and replace underscores)
         name = strategy_id.replace("_", " ").title()
+        description = STRATEGY_DESCRIPTIONS.get(strategy_id)
+        if description is None:
+            logger.warning("Missing description for strategy ID: %s", strategy_id)
 
-        # Create strategy info object
         strategies.append(
             StrategyInfo(
                 id=strategy_id,
                 name=name,
-                description=None,  # Can be extended later with descriptions
+                description=description,
             )
         )
 
