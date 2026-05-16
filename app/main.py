@@ -1,13 +1,17 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from app.base.interface import RootResponse
 from app.news.router import router as newsRouter
 from app.ticker.router import router as tickerRouter
 from app.signals.router import router as signalsRouter
 from app.ai.router import router as aiRouter
 from app.notification.router import router as notificationRouter
-from fastapi.middleware.cors import CORSMiddleware
+from app.scheduler import build_scheduler
 from chainlit.utils import mount_chainlit
-from fastapi.staticfiles import StaticFiles
 
 origins = [
     "https://okane-signals.vercel.app",
@@ -25,7 +29,17 @@ origins = [
     "http://localhost:3000",
 ]
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = build_scheduler()
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=True)
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
