@@ -4,6 +4,8 @@ import pytz
 import yfinance as yf
 import pandas as pd
 
+_YFINANCE_DOWNLOAD_TIMEOUT_SECONDS = 20
+
 def get_dates(period):
   utc = datetime.now(pytz.utc)
   tz = pytz.timezone("Asia/Singapore")
@@ -33,10 +35,15 @@ def getYFinanceData(ticker, interval, period=None, start=None, end=None):
   period = int(period[:-1])
   end, start = get_dates(period)
 
-  if period != None:
-    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False, auto_adjust=True)
-  else:
-    dataF = yf.download(tickers=ticker, interval=interval, start=start, end=end, multi_level_index = False, auto_adjust=True)
+  dataF = yf.download(
+    tickers=ticker,
+    interval=interval,
+    start=start,
+    end=end,
+    multi_level_index=False,
+    auto_adjust=True,
+    timeout=_YFINANCE_DOWNLOAD_TIMEOUT_SECONDS,
+  )
 
   dataF.iloc[:, :]
 

@@ -33,6 +33,8 @@ from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
 
 executor = ThreadPoolExecutor(max_workers=5)
 
+REPLAY_TIMEOUT_SECONDS = 120
+
 
 def safe_float(value, default=0.0, decimals=3):
     """Safely convert a value to float, handling NaN and None values."""
@@ -554,7 +556,10 @@ async def replay_backtest(backtest_id: int):
         return replay_backtest_func(df, trade_schedule)
 
     try:
-        bt, stats, trade_actions, strategy_parameters = await asyncio.to_thread(_run_replay)
+        bt, stats, trade_actions, strategy_parameters = await asyncio.wait_for(
+            asyncio.to_thread(_run_replay),
+            timeout=REPLAY_TIMEOUT_SECONDS,
+        )
         if bt is None or stats is None:
             print("[REPLAY] Backtest returned None")
             raise HTTPException(
@@ -562,6 +567,17 @@ async def replay_backtest(backtest_id: int):
                 detail="Backtest replay returned no results.",
             )
         print(f"[REPLAY] Backtest completed successfully")
+    except asyncio.TimeoutError:
+        logging.error(
+            "Replay timed out after %ss. backtest_id=%s",
+            REPLAY_TIMEOUT_SECONDS,
+            backtest_id,
+        )
+        raise HTTPException(
+            status_code=408,
+            detail=f"Backtest replay timed out after {REPLAY_TIMEOUT_SECONDS}s. "
+            "The data source may be stalled — try again.",
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -582,7 +598,21 @@ async def replay_backtest(backtest_id: int):
         print(f"[REPLAY] HTML ends with: {content[-200:]}")
         return content
 
-    html_content = await asyncio.to_thread(_render_html)
+    try:
+        html_content = await asyncio.wait_for(
+            asyncio.to_thread(_render_html),
+            timeout=REPLAY_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logging.error(
+            "Replay HTML render timed out after %ss. backtest_id=%s",
+            REPLAY_TIMEOUT_SECONDS,
+            backtest_id,
+        )
+        raise HTTPException(
+            status_code=408,
+            detail=f"Backtest replay timed out after {REPLAY_TIMEOUT_SECONDS}s during HTML render.",
+        )
     logging.info("replay_backtest finished")
 
     # Compress the HTML to match the format stored in the DB (zlib + base64).
