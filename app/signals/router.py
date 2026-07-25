@@ -15,8 +15,8 @@ from app.signals.dto import (
     SignalResponseDTO,
     StrategyListResponseDTO,
 )
-from app.signals.hmm_service import get_hmm_regime_data
 from app.signals.hmm_dto import HMMRequestDTO, HMMResponseDTO
+from app.signals.hmm_service import get_hmm_regime_data
 
 router = APIRouter(
     prefix="/signals",
@@ -135,17 +135,19 @@ async def get_hmm_regimes(
     Get Hidden Markov Model (HMM) market regime probabilities.
 
     Returns a time series of regime probabilities (Bull, Bear, Chop) for the given ticker.
-    Based on a 3-state HMM with Bayesian updating.
+    Uses a 3-state HMM with Bayesian updating, forward-backward smoothing, and
+    hysteresis to produce an accurate, whipsaw-resistant regime timeline.
 
-    Regime characteristics:
-    - Bull: Positive momentum, lower volatility
-    - Bear: Negative momentum, higher volatility
-    - Chop: Low momentum, high volatility (sideways/noise)
+    Two probability streams are returned per bar:
+    - prob_bull/bear/chop: causal filtered (never revised — safe for live signals)
+    - prob_*_smoothed: forward-backward smoothed (accurate historical display)
 
     Response includes:
-    - Full time series of regime probabilities
-    - Current dominant regime and confidence score
-    - Recommended trading strategy
+    - Full time series with filtered + smoothed probabilities, regime labels,
+      duration info, and richer confidence metrics
+    - transition_events: list of regime-change events with timestamps
+    - regime_statistics: per-regime aggregate statistics
+    - summary: current regime with recommended strategy
 
     Example:
         GET /signals/hmm/regimes?ticker=AAPL&period=365d&interval=1d
@@ -160,4 +162,7 @@ async def get_hmm_regimes(
         p_stay_bull=params.p_stay_bull,
         p_stay_bear=params.p_stay_bear,
         p_stay_chop=params.p_stay_chop,
+        adaptive=params.adaptive,
+        min_dwell=params.min_dwell,
+        switch_margin=params.switch_margin,
     )
