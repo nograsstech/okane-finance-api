@@ -94,6 +94,28 @@ class TestBacktestStatRepository:
         assert fetched is not None
         assert fetched.sharpe_ratio == 2.5
 
+    async def test_upsert_preserves_existing_notifications_when_omitted(self, db_session):
+        repo = BacktestStatRepository(db_session)
+        stat = await repo.insert(_backtest_payload(ticker="MSFT", notifications_on=True))
+        update = _backtest_payload(ticker="MSFT", sharpe_ratio=2.0)
+        update.pop("notifications_on")
+
+        updated = await repo.upsert(update)
+
+        assert updated is not None
+        assert updated.id == stat.id
+        assert updated.notifications_on is True
+
+    async def test_get_replay_metadata_excludes_html(self, db_session):
+        repo = BacktestStatRepository(db_session)
+        stat = await repo.insert(_backtest_payload(ticker="TSLA", html="large-chart"))
+
+        metadata = await repo.get_replay_metadata(stat.id)
+
+        assert metadata is not None
+        assert metadata.ticker == "TSLA"
+        assert not hasattr(metadata, "html")
+
     async def test_insert_multiple_records(self, db_session):
         repo = BacktestStatRepository(db_session)
         for i in range(3):
