@@ -471,8 +471,8 @@ async def replay_backtest(backtest_id: int):
         backtest_repo = BacktestStatRepository(session)
         trade_repo = TradeActionRepository(session)
 
-        # Get the BacktestStat
-        backtest_stat = await backtest_repo.get_by_id(backtest_id)
+        # Get only the metadata needed for replay; the stored HTML is not used here.
+        backtest_stat = await backtest_repo.get_replay_metadata(backtest_id)
         if backtest_stat is None:
             print(f"[REPLAY] Backtest with ID {backtest_id} not found")
             raise HTTPException(status_code=404, detail=f"Backtest with ID {backtest_id} not found")

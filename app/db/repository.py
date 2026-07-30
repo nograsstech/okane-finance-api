@@ -70,7 +70,11 @@ class BacktestStatRepository:
             # so we never need to issue a get_by_id() SELECT (which would load html).
             return SimpleNamespace(
                 id=existing.id,
-                notifications_on=update_data.get("notifications_on"),
+                notifications_on=(
+                    update_data["notifications_on"]
+                    if "notifications_on" in update_data
+                    else existing.notifications_on
+                ),
             )
         else:
             return await self.insert(data)
@@ -87,6 +91,19 @@ class BacktestStatRepository:
         stmt = select(BacktestStat).where(BacktestStat.id == backtest_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_replay_metadata(self, backtest_id: int):
+        """Return only the fields needed to replay a backtest."""
+        stmt = select(
+            BacktestStat.ticker,
+            BacktestStat.strategy,
+            BacktestStat.interval,
+            BacktestStat.period,
+            BacktestStat.start_time,
+            BacktestStat.end_time,
+        ).where(BacktestStat.id == backtest_id)
+        result = await self._session.execute(stmt)
+        return result.first()
 
 
 # ---------------------------------------------------------------------------
