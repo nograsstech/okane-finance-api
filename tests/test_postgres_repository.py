@@ -167,3 +167,32 @@ class TestTradeActionRepository:
         repo = TradeActionRepository(db_session)
         result = await repo.get_latest_for_strategy(999)
         assert result is None
+
+
+class TestPortfolioReplayRepository:
+    async def test_filters_to_enabled_strategies_and_requested_dates(self, db_session):
+        enabled = await BacktestStatRepository(db_session).insert(
+            _backtest_payload(ticker="ON", notifications_on=True)
+        )
+        disabled = await BacktestStatRepository(db_session).insert(
+            _backtest_payload(ticker="OFF", notifications_on=False)
+        )
+        actions = TradeActionRepository(db_session)
+        await actions.insert_many(
+            [
+                _trade_action_payload(enabled.id, "2024-01-02T00:00:00"),
+                _trade_action_payload(enabled.id, "2024-02-02T00:00:00"),
+                _trade_action_payload(disabled.id, "2024-01-02T00:00:00"),
+            ]
+        )
+
+        strategies = await BacktestStatRepository(db_session).get_enabled_for_portfolio_replay()
+        replay_actions = await actions.get_for_portfolio_replay(
+            [strategy.id for strategy in strategies],
+            datetime(2024, 1, 1),
+            datetime(2024, 2, 1),
+        )
+
+        assert [strategy.ticker for strategy in strategies] == ["ON"]
+        assert len(replay_actions) == 1
+        assert replay_actions[0].backtest_id == enabled.id

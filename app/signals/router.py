@@ -11,12 +11,15 @@ from app.signals.dto import (
     BacktestReplayRequestDTO,
     BacktestReplayResponseDTO,
     BacktestResponseDTO,
+    PortfolioReplayRequestDTO,
+    PortfolioReplayResponseDTO,
     SignalRequestDTO,
     SignalResponseDTO,
     StrategyListResponseDTO,
 )
 from app.signals.hmm_dto import HMMRequestDTO, HMMResponseDTO
 from app.signals.hmm_service import get_hmm_regime_data
+from app.signals.portfolio_replay import portfolio_replay
 
 router = APIRouter(
     prefix="/signals",
@@ -103,6 +106,18 @@ async def replay_backtest_endpoint(
     return await service.replay_backtest(
         backtest_id=params.backtest_id,
     )
+
+
+@router.post(
+    "/portfolio-replay",
+    status_code=HTTP_200_OK,
+    response_model=PortfolioReplayResponseDTO,
+)
+async def portfolio_replay_endpoint(
+    params: PortfolioReplayRequestDTO,
+    username: Annotated[str, Depends(get_current_username)],
+) -> PortfolioReplayResponseDTO:
+    return await portfolio_replay(params)
 
 
 @router.post("/strategy-notification-job", status_code=HTTP_200_OK)

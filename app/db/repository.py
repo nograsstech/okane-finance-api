@@ -7,6 +7,7 @@ They replace all direct supabase.table(...) calls.
 
 from __future__ import annotations
 
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Any, Protocol, runtime_checkable
 
@@ -105,6 +106,21 @@ class BacktestStatRepository:
         result = await self._session.execute(stmt)
         return result.first()
 
+    async def get_enabled_for_portfolio_replay(self):
+        """Return slim metadata for strategies currently enabled for notifications."""
+        stmt = (
+            select(
+                BacktestStat.id,
+                BacktestStat.ticker,
+                BacktestStat.strategy,
+                BacktestStat.interval,
+            )
+            .where(BacktestStat.notifications_on.is_(True))
+            .order_by(BacktestStat.id.asc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.all())
+
 
 # ---------------------------------------------------------------------------
 # TradeActionRepository
@@ -141,6 +157,27 @@ class TradeActionRepository:
             select(TradeAction)
             .where(TradeAction.backtest_id == backtest_id)
             .order_by(TradeAction.datetime.asc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_for_portfolio_replay(
+        self,
+        backtest_ids: list[int],
+        start: datetime,
+        end_exclusive: datetime,
+    ) -> list[TradeAction]:
+        """Return dated actions for enabled strategies in a half-open date range."""
+        if not backtest_ids:
+            return []
+        stmt = (
+            select(TradeAction)
+            .where(
+                TradeAction.backtest_id.in_(backtest_ids),
+                TradeAction.datetime >= start,
+                TradeAction.datetime < end_exclusive,
+            )
+            .order_by(TradeAction.datetime.asc(), TradeAction.id.asc())
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())

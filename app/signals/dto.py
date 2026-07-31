@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.signals.strategies.strategy_list import strategy_list
 
@@ -111,6 +112,101 @@ class BacktestReplayResponseDTO(BaseModel):
     status: int = Field(...)
     message: str = Field(...)
     data: BacktestStats = Field(...)
+
+
+class PortfolioReplayRequestDTO(BaseModel):
+    start_date: date
+    end_date: date
+    starting_equity: float = Field(gt=0, allow_inf_nan=False)
+    risk_per_trade: float = Field(
+        gt=0, allow_inf_nan=False, description="Fixed USD risk for each signal"
+    )
+    cost_per_trade: float = Field(ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> PortfolioReplayRequestDTO:
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        if self.end_date > date.today():
+            raise ValueError("end_date cannot be in the future")
+        if (self.end_date - self.start_date).days > 59:
+            raise ValueError("date range cannot exceed 59 days")
+        return self
+
+
+class PortfolioReplaySummaryDTO(BaseModel):
+    starting_equity: float
+    ending_equity: float
+    net_pnl: float
+    return_percentage: float
+    realized_pnl: float
+    unrealized_pnl: float
+    total_costs: float
+    max_drawdown: float
+    max_drawdown_percentage: float
+    total_trades: int
+    closed_trades: int
+    open_trades: int
+    wins: int
+    losses: int
+    win_rate: float | None
+
+
+class PortfolioEquityPointDTO(BaseModel):
+    datetime: datetime
+    equity: float
+    pnl: float
+
+
+class PortfolioReplayTradeDTO(BaseModel):
+    backtest_id: int
+    ticker: str
+    strategy: str
+    datetime: datetime
+    action: str
+    direction: Literal["long", "short"]
+    entry_price: float
+    exit_price: float | None
+    stop_loss: float
+    take_profit: float | None
+    risk_units: float
+    r_multiple: float | None
+    pnl: float | None
+    cost: float
+    status: Literal["tp", "sl", "close", "marked", "skipped"]
+    exit_datetime: datetime | None
+    message: str
+
+
+class PortfolioStrategyResultDTO(BaseModel):
+    backtest_id: int
+    ticker: str
+    strategy: str
+    trades: int
+    closed_trades: int
+    open_trades: int
+    wins: int
+    net_pnl: float
+    win_rate: float | None
+    average_r: float | None
+
+
+class PortfolioReplayDataDTO(BaseModel):
+    start_date: date
+    end_date: date
+    summary: PortfolioReplaySummaryDTO
+    enabled_strategy_count: int
+    strategy_count_with_actions: int
+    equity_curve: list[PortfolioEquityPointDTO]
+    strategies: list[PortfolioStrategyResultDTO]
+    trades: list[PortfolioReplayTradeDTO]
+    warnings: list[str]
+
+
+class PortfolioReplayResponseDTO(BaseModel):
+    status: int
+    message: str
+    data: PortfolioReplayDataDTO
 
 
 class StrategyInfo(BaseModel):
