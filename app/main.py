@@ -1,6 +1,5 @@
 import os
 
-from app.health import router as health_router
 from chainlit.utils import mount_chainlit
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +10,7 @@ from starlette.types import Receive, Scope, Send
 from app.ai.router import router as ai_router
 from app.base.interface import RootResponse
 from app.config import Settings, get_settings
+from app.health import router as health_router
 from app.news.router import router as news_router
 from app.notification.router import router as notification_router
 from app.signals.router import router as signals_router
