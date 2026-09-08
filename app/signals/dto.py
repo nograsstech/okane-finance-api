@@ -24,7 +24,7 @@ class SignalRequestDTO(BaseModel):
     backtest_process_uuid: str | None = Field(None)
     skip_optimization: bool = Field(
         True,
-        description="Skip parameter optimization unless an expensive optimization run is requested.",
+        description="Skip optimization unless an expensive optimization run is requested.",
     )
 
     @field_validator("strategy")
