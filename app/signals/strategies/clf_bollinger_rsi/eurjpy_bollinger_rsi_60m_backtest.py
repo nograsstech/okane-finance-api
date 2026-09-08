@@ -1,8 +1,5 @@
 from backtesting import Strategy
 from backtesting import Backtest
-import multiprocessing as mp
-if mp.get_start_method(allow_none=True) != 'fork':
-    mp.set_start_method('fork', force=True)
 
 def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best_params=None):
     dftest = df[:]

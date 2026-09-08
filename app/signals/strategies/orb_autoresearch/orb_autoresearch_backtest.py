@@ -10,17 +10,12 @@ without re-running signal generation.
 """
 
 import logging
-import multiprocessing as mp
 import time as _time
 
 import numpy as np
 from backtesting import Backtest, Strategy
 
 logger = logging.getLogger(__name__)
-
-if mp.get_start_method(allow_none=True) != "fork":
-    mp.set_start_method("fork", force=True)
-
 
 class ORBAutoresearchStrat(Strategy):
     """

@@ -1,7 +1,4 @@
 from backtesting import Strategy, Backtest
-import multiprocessing as mp
-if mp.get_start_method(allow_none=True) != 'fork':
-    mp.set_start_method('fork', force=True)
 import numpy as np
 
 # Module-level data container (will be set before backtest runs)
