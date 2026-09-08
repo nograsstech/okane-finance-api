@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import importlib
+import inspect
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 from fastapi import HTTPException
 
@@ -21,7 +25,7 @@ def _request(**overrides: object) -> SignalRequestDTO:
     return SignalRequestDTO(**values)
 
 
-def test_strategy_import_uses_spawn_instead_of_fork() -> None:
+def test_strategy_import_uses_threaded_optimizer_without_changing_process_context() -> None:
     project_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
         [
@@ -29,8 +33,11 @@ def test_strategy_import_uses_spawn_instead_of_fork() -> None:
             "-c",
             (
                 "import multiprocessing as mp; "
+                "from multiprocessing.dummy import Pool; "
+                "import backtesting; "
                 "import app.signals.strategies.perform_backtest; "
-                "print(mp.get_start_method(allow_none=True))"
+                "print(mp.get_start_method(allow_none=True)); "
+                "print(backtesting.Pool is Pool)"
             ),
         ],
         cwd=project_root,
@@ -39,12 +46,66 @@ def test_strategy_import_uses_spawn_instead_of_fork() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "spawn"
+    assert result.stdout.strip().splitlines() == ["None", "True"]
 
 
 def test_backtest_requests_skip_optimization_by_default() -> None:
     assert _request().skip_optimization is True
     assert _request(skip_optimization=False).skip_optimization is False
+
+
+def test_dispatched_backtests_accept_optimization_control() -> None:
+    from app.signals.strategies import perform_backtest as dispatcher
+
+    backtests = [
+        value
+        for name, value in vars(dispatcher).items()
+        if name.endswith("_backtest") and callable(value)
+    ]
+
+    assert backtests
+    assert all(
+        "skip_optimization" in inspect.signature(backtest).parameters
+        for backtest in backtests
+    )
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_backtest",
+        "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_backtest_15m",
+        "app.signals.strategies.clf_bollinger_rsi.eurjpy_bollinger_rsi_60m_backtest",
+    ],
+)
+def test_legacy_backtests_supply_defaults_when_optimization_is_skipped(
+    monkeypatch,
+    module_name: str,
+) -> None:
+    module = importlib.import_module(module_name)
+
+    class FakeBacktest:
+        def __init__(self, _frame, _strategy, **_kwargs) -> None:
+            self._strategy = SimpleNamespace(trades_actions=[])
+
+        def run(self) -> dict[str, object]:
+            return {}
+
+    monkeypatch.setattr(module, "Backtest", FakeBacktest)
+    frame = pd.DataFrame({"TotalSignal": [0]})
+
+    _, _, _, parameters = module.backtest(
+        frame,
+        {"best": False},
+        skip_optimization=True,
+    )
+
+    assert parameters == {
+        "best": True,
+        "TPcoef": 2,
+        "slcoef": 3,
+        "tpslRatio": 2 / 3,
+    }
 
 
 @pytest.mark.asyncio
@@ -84,20 +145,12 @@ async def test_background_backtest_forwards_optimization_choice() -> None:
 
 
 @pytest.mark.asyncio
-async def test_healthcheck_probes_the_backtest_executor(monkeypatch) -> None:
+async def test_healthcheck_probes_the_backtest_executor() -> None:
     from app import health
+    from app.signals import service
 
-    probed = False
-
-    async def fake_to_thread(function, /, *args, **kwargs):
-        nonlocal probed
-        probed = True
-        return function(*args, **kwargs)
-
-    monkeypatch.setattr(health.asyncio, "to_thread", fake_to_thread)
-
+    assert health.BACKTEST_EXECUTOR is service.BACKTEST_EXECUTOR
     assert await health.healthcheck() == {"status": "ok"}
-    assert probed is True
 
 
 @pytest.mark.asyncio
@@ -107,7 +160,7 @@ async def test_healthcheck_fails_when_the_backtest_executor_is_unavailable(
     from app import health
 
     async def timeout(_awaitable, *, timeout):
-        _awaitable.close()
+        _awaitable.cancel()
         raise TimeoutError
 
     monkeypatch.setattr(health.asyncio, "wait_for", timeout)
