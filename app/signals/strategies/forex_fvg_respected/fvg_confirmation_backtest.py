@@ -1,9 +1,6 @@
 from backtesting import Strategy, Backtest
 import pandas_ta as ta
 import pandas as pd
-import multiprocessing as mp
-if mp.get_start_method(allow_none=True) != 'fork':
-    mp.set_start_method('fork', force=True)
 
 class QuantFVGStrategy(Strategy):
     # Optimization parameters

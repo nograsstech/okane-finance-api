@@ -74,7 +74,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Set entrypoint to fix permissions before starting
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

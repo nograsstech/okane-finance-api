@@ -18,6 +18,7 @@ class SignalRequestDTO(BaseModel):
     end: str | None = Field(None)
     strategy_id: str | None = Field(None)
     backtest_process_uuid: str | None = Field(None)
+    skip_optimization: bool = Field(True)
 
 
 class Signal(BaseModel):

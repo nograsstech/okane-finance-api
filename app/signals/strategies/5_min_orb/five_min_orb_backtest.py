@@ -10,14 +10,9 @@ Version A: Immediate breakout entry
 from backtesting import Strategy
 from backtesting import Backtest
 import logging
-import multiprocessing as mp
 import numpy as np
 
 logger = logging.getLogger(__name__)
-
-if mp.get_start_method(allow_none=True) != 'fork':
-    mp.set_start_method('fork', force=True)
-
 
 class FiveMinORBStrat(Strategy):
     """

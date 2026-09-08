@@ -5,13 +5,8 @@ This strategy executes trades that were previously stored in the database,
 allowing for replay of backtests with fresh historical price data.
 """
 
-import multiprocessing as mp
-
 import pandas as pd
 from backtesting import Backtest, Strategy
-
-if mp.get_start_method(allow_none=True) != 'fork':
-    mp.set_start_method('fork', force=True)
 
 
 def backtest(df, trade_schedule, cash=100000, margin=1/500):
