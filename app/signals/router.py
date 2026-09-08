@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 from starlette.status import HTTP_200_OK
@@ -7,7 +7,6 @@ from starlette.status import HTTP_200_OK
 from app.auth.basic_auth import get_current_username
 from app.signals import service
 from app.signals.dto import (
-    BacktestProcessResponseDTO,
     BacktestReplayRequestDTO,
     BacktestReplayResponseDTO,
     BacktestResponseDTO,
@@ -51,7 +50,7 @@ async def backtest(
     username: Annotated[str, Depends(get_current_username)],
     background_tasks: BackgroundTasks,
     params: SignalRequestDTO = Depends(),
-) -> BacktestProcessResponseDTO:
+) -> str:
     backtest_process_uuid = uuid.uuid4()
 
     # Schedule the async work as a FastAPI background task
@@ -60,12 +59,12 @@ async def backtest(
         ticker=params.ticker,
         interval=params.interval,
         period=params.period,
-        strategy=params.strategy,
+        strategy=cast(str, params.strategy),
         parameters=params.parameters,
         start=params.start,
         end=params.end,
         strategy_id=params.strategy_id,
-        backtest_process_uuid=params.backtest_process_uuid,
+        backtest_process_uuid=str(backtest_process_uuid),
         skip_optimization=params.skip_optimization,
     )
     return str(backtest_process_uuid)
@@ -80,7 +79,7 @@ async def backtest_sync(
         ticker=params.ticker,
         interval=params.interval,
         period=params.period,
-        strategy=params.strategy,
+        strategy=cast(str, params.strategy),
         parameters=params.parameters,
         start=params.start,
         end=params.end,

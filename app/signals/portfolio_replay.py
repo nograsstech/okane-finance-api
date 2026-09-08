@@ -13,7 +13,7 @@ import yfinance as yf
 
 from app.db.postgres import AsyncSessionLocal
 from app.db.repository import BacktestStatRepository, TradeActionRepository
-from app.signals.dto import PortfolioReplayRequestDTO
+from app.signals.dto import PortfolioReplayRequestDTO, PortfolioReplayResponseDTO
 
 _INTERVAL_FALLBACKS = ("5m", "15m", "1h", "1d")
 _CLOSE_ACTIONS = {"close", "closed", "exit", "flatten", "close_long", "close_short"}
@@ -25,7 +25,7 @@ _INTERVAL_DURATIONS = {
 }
 
 
-async def portfolio_replay(params: PortfolioReplayRequestDTO) -> dict[str, Any]:
+async def portfolio_replay(params: PortfolioReplayRequestDTO) -> PortfolioReplayResponseDTO:
     """Load enabled strategy actions, then run the CPU-bound replay off-loop."""
     async with AsyncSessionLocal() as session:
         strategies = await BacktestStatRepository(session).get_enabled_for_portfolio_replay()
@@ -36,7 +36,8 @@ async def portfolio_replay(params: PortfolioReplayRequestDTO) -> dict[str, Any]:
             start,
             end_exclusive,
         )
-    return await asyncio.to_thread(run_portfolio_replay, strategies, actions, params)
+    result = await asyncio.to_thread(run_portfolio_replay, strategies, actions, params)
+    return PortfolioReplayResponseDTO.model_validate(result)
 
 
 def _as_naive_utc(value: Any) -> datetime:
@@ -283,6 +284,8 @@ def _replay_strategy(
                 f"{action_at.isoformat()} because entry/SL risk was invalid"
             )
             continue
+        assert entry_price is not None
+        assert stop_loss is not None
         if take_profit is not None and (
             (direction == "long" and take_profit <= entry_price)
             or (direction == "short" and take_profit >= entry_price)

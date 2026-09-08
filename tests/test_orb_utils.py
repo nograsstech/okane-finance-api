@@ -5,12 +5,10 @@ Tests timezone conversion, session detection, and OR calculations.
 """
 
 import pytest
-import importlib
 import pandas as pd
 from datetime import datetime, UTC, date
 
-# Import from module with numeric name using importlib
-orb_utils = importlib.import_module("app.signals.strategies.5_min_orb.orb_utils")
+from app.signals.strategies.five_min_orb import orb_utils
 
 convert_utc_to_session_time = orb_utils.convert_utc_to_session_time
 detect_session_window = orb_utils.detect_session_window

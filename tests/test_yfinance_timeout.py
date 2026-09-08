@@ -36,3 +36,25 @@ def test_get_yfinance_data_passes_timeout_to_download(monkeypatch):
     assert captured["timeout"] == _YFINANCE_DOWNLOAD_TIMEOUT_SECONDS
     assert captured["timeout"] is not None
     assert not df.empty
+
+
+def test_get_yfinance_data_honors_explicit_date_range(monkeypatch):
+    captured: dict = {}
+
+    def fake_download(**kwargs):
+        captured.update(kwargs)
+        return _fake_yf_frame()
+
+    monkeypatch.setattr(yfinance_module.yf, "download", fake_download)
+
+    df = getYFinanceData(
+        ticker="AAPL",
+        interval="1d",
+        period=None,
+        start="2024-01-01",
+        end="2024-02-01",
+    )
+
+    assert captured["start"] == "2024-01-01"
+    assert captured["end"] == "2024-02-01"
+    assert not df.empty

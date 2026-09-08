@@ -116,6 +116,14 @@ class TestBacktestStatRepository:
         assert metadata.ticker == "TSLA"
         assert not hasattr(metadata, "html")
 
+    async def test_lock_for_trade_actions_keeps_the_transaction_open(self, db_session):
+        repo = BacktestStatRepository(db_session)
+        stat = await repo.insert(_backtest_payload(ticker="LOCK"))
+
+        await repo.lock_for_trade_actions(stat.id)
+
+        assert db_session.in_transaction()
+
     async def test_insert_multiple_records(self, db_session):
         repo = BacktestStatRepository(db_session)
         for i in range(3):

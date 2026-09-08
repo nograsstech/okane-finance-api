@@ -1,14 +1,9 @@
-from io import BytesIO
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
-from app.ai.chatbot import get_langgraph_graph
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from app.ai.service import get_chatbot_response_stream
-from typing import List, Dict
-from app.ai.service import get_chat_history
-
 import json
+from io import BytesIO
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 
 
 class MessageRequest(BaseModel):
@@ -25,6 +20,8 @@ router = APIRouter(
 
 @router.get("/graph")
 async def get_graph():
+    from app.ai.chatbot import get_langgraph_graph
+
     image_data = get_langgraph_graph()
     return StreamingResponse(BytesIO(image_data), media_type="image/png")
 
@@ -105,6 +102,8 @@ def serialize_message(message):
 @router.post("/chatbot-with-tool")
 async def chatbot(request: MessageRequest):
     try:
+        from app.ai.service import get_chatbot_response_stream
+
         user_input = request.message
         thread_id = request.thread_id
 
@@ -165,7 +164,9 @@ async def chatbot(request: MessageRequest):
 @router.get("/chat")
 async def get_chat(thread_id: str):
     try:
-        messages: List[Dict] = await get_chat_history(thread_id=thread_id)
+        from app.ai.service import get_chat_history
+
+        messages: list[dict] = await get_chat_history(thread_id=thread_id)
 
         # Format the response to match the streaming format for consistency
         response = {"status": "complete", "thread_id": thread_id, "content": messages}

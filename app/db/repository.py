@@ -93,6 +93,20 @@ class BacktestStatRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def lock_for_trade_actions(self, backtest_id: int) -> None:
+        """Serialize trade-action deduplication for one persisted backtest.
+
+        The lock remains held by the current transaction until its next commit or
+        rollback. This keeps the latest-action check and following insert atomic
+        across concurrent cron workers without changing the database schema.
+        """
+        stmt = (
+            select(BacktestStat.id)
+            .where(BacktestStat.id == backtest_id)
+            .with_for_update()
+        )
+        await self._session.execute(stmt)
+
     async def get_replay_metadata(self, backtest_id: int):
         """Return only the fields needed to replay a backtest."""
         stmt = select(

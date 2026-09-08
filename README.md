@@ -1,108 +1,167 @@
 # okane-finance-api
 
-Okane Finance API — signals, AI, and financial data platform built with FastAPI.
+FastAPI backend-for-frontend for Okane Finance. It serves trading signals and market-regime
+data, runs strategy backtests and replays, persists results, and exposes a scheduled strategy
+notification job. The repository also contains the existing AI, news, ticker, notification,
+and Chainlit features.
 
----
+## Requirements
 
-## Prerequisites
+- Python 3.13 (pinned in `.python-version`)
+- [uv](https://docs.astral.sh/uv/)
+- Docker, only when building or running the container
 
-| Tool | Version | Install |
-|------|---------|---------|
-| Python | 3.14+ | [python.org](https://www.python.org/) or `pyenv install 3.14` |
-| uv | latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+`pyproject.toml` and `uv.lock` are the dependency sources of truth. The patched `pandas-ta`
+wheel in `vendor/` is resolved through `pyproject.toml`.
 
----
+## Local development
 
-## Local Development
-
-Quickly start the dev server
-```zsh
-uv sync
-source .venv/bin/activate
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-### 1. Create & activate the virtual environment
+Install the locked runtime and development dependencies:
 
 ```zsh
-# uv reads .python-version (3.14) and creates .venv automatically
-uv sync
-source .venv/bin/activate
+uv sync --frozen --dev
 ```
 
-### 2. Install dependencies (including dev tools)
+Configure the required environment variables in `.env`, then start the API:
 
 ```zsh
-uv sync --dev
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-> **Note:** The `pandas_ta` dependency is a local vendor wheel (`vendor/pandas_ta-0.3.14b0-py3-none-any.whl`). uv resolves it automatically via `pyproject.toml`.
+The API is available at `http://127.0.0.1:8000`; FastAPI documentation is at `/docs`.
+Core settings are loaded lazily, so importing `app.main` does not connect to a database or
+prompt for credentials.
 
-### 3. Run the development server
+Core environment variables retain their existing names:
+
+| Variable | Purpose |
+| --- | --- |
+| `OKANE_FINANCE_API_USER` | HTTP Basic username |
+| `OKANE_FINANCE_API_PASSWORD` | HTTP Basic password |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `MONGO_USER` | MongoDB username |
+| `MONGO_PASSWORD` | MongoDB password |
+| `ENV` | Selects the `production` or `develop` MongoDB database |
+
+AI, notification, and deployment modules require their existing provider-specific variables.
+
+## Core structure
+
+```text
+app/
+├── main.py                         # Application factory and router registration
+├── config.py                       # Lazy typed settings
+├── auth/basic_auth.py              # HTTP Basic dependency
+├── db/
+│   ├── postgres.py                 # Lazy async SQLAlchemy setup
+│   └── repository.py               # PostgreSQL persistence operations
+├── base/utils/mongodb.py           # Lazy shared Motor client
+└── signals/
+    ├── router.py                   # Stable HTTP endpoints
+    ├── dto.py                      # Signal, backtest, and replay wire schemas
+    ├── service.py                  # Compatibility imports for existing callers
+    ├── services/
+    │   ├── signals.py              # Signal request orchestration
+    │   ├── backtests.py            # Backtest execution, persistence, notifications
+    │   ├── replay.py               # Stored-trade replay
+    │   ├── results.py              # Shared stats, HTML, and compression helpers
+    │   └── strategy_jobs.py        # Strategy listing and scheduled refresh job
+    ├── portfolio_replay.py         # Cohesive portfolio replay calculation
+    ├── hmm_service.py              # Cohesive HMM regime calculation
+    ├── utils/yfinance.py           # Market-data adapter
+    └── strategies/                 # Strategy algorithms and dispatch
+```
+
+Routers own HTTP validation and authentication. Services orchestrate market-data calls,
+offload blocking calculations, and coordinate repositories. Numerical HMM, portfolio replay,
+and strategy algorithms remain cohesive instead of being split by file length.
+
+## Core endpoints
+
+All `/signals` endpoints use HTTP Basic authentication.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/signals/` | Generate signals |
+| `GET` | `/signals/backtest` | Queue a background backtest and return its UUID |
+| `GET` | `/signals/backtest/sync` | Run a backtest and return the full result envelope |
+| `GET` | `/signals/backtest/replay` | Replay one stored backtest |
+| `POST` | `/signals/portfolio-replay` | Replay enabled strategies as a portfolio |
+| `POST` | `/signals/strategy-notification-job` | Run the scheduled strategy refresh |
+| `GET` | `/signals/strategies` | List public strategy identifiers |
+| `GET` | `/signals/hmm/regimes` | Calculate market-regime probabilities |
+
+Successful structured responses retain the `{status, message, data}` envelope.
+
+## Tests and quality checks
+
+Run the non-integration suite:
 
 ```zsh
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+uv run pytest -m "not integration" --tb=short -q
 ```
 
-The API will be available at: `http://127.0.0.1:8000`
-
----
-
-## Package Management
-
-This project uses **[uv](https://github.com/astral-sh/uv)** for fast, reproducible dependency management.
+Run the focused core coverage gate:
 
 ```zsh
-# Add a new runtime dependency
-uv add <package>
-
-# Add a dev-only dependency
-uv add --dev <package>
-
-# Remove a dependency
-uv remove <package>
-
-# Sync environment to match lock file exactly
-uv sync --frozen
+uv run pytest -m "not integration" --tb=short -q \
+  --cov=app.signals.services \
+  --cov=app.signals.utils.yfinance \
+  --cov=app.signals.hmm_service \
+  --cov=app.signals.portfolio_replay \
+  --cov=app.auth.basic_auth \
+  --cov=app.base.utils.mongodb \
+  --cov=app.db.repository \
+  --cov-report=term-missing \
+  --cov-fail-under=80
 ```
 
-The `uv.lock` file is **committed to the repository** to guarantee reproducible builds across environments and CI.
+Run the configured focused type check:
 
----
-
-## Typing & Validation
-
-This project uses **[Pydantic v2](https://docs.pydantic.dev/)** as its primary data validation and typing library. All request/response schemas and config models are defined with Pydantic.
-
-```python
-from pydantic import BaseModel
-from pydantic_settings import BaseSettings
-
-class SignalResponse(BaseModel):
-    symbol: str
-    action: str
-    confidence: float
+```zsh
+uv run mypy
 ```
 
----
+CI also runs Ruff against the refactored core and its tests; its explicit path list avoids a
+repository-wide formatting diff in legacy modules. Whole-application coverage and legacy Ruff
+debt are tracked separately and are not hidden with broad ignore rules.
+
+## Adding a strategy
+
+1. Create a valid Python package under `app/signals/strategies/`.
+2. Implement the signal calculation and backtest entry point using the existing neighboring
+   strategies as the smallest useful template.
+3. Add direct imports and dispatch cases in `strategies/calculate.py` and
+   `strategies/perform_backtest.py`.
+4. Add the public identifier to `strategies/strategy_list.py`.
+5. Add tests for signal calculation, dispatch, and the expected numerical behavior.
+
+Python package names and public strategy identifiers are separate. For example,
+`five_min_orb` is the internal package while `5_min_orb` remains the public API identifier;
+`five_min_orb_confirmation` similarly maps to `5_min_orb_confirmation`.
+
+## Utility scripts
+
+Repository utilities live under `scripts/`. For example, the stock-list refresh reads MongoDB
+credentials from the normal environment settings:
+
+```zsh
+uv run python scripts/refresh_us_stock_marketcap.py
+```
+
+This script performs network and database writes; do not use it as a test command.
 
 ## Docker
 
-### Build
+Build and run the production image:
 
 ```zsh
 docker build -t okane-finance-api .
+docker run --rm -p 8000:8000 --env-file .env okane-finance-api
 ```
 
-The Dockerfile uses a **2-stage build**:
-1. **Builder** — installs all dependencies with uv into a `.venv`
-2. **Runtime** — copies the `.venv` into a lean image, runs as a non-root `appuser`
-
-### Run
-
-```zsh
-docker run -p 8000:8000 --env-file .env okane-finance-api
-```
+The multi-stage image installs from `pyproject.toml` and `uv.lock` with Python 3.13 and runs
+the application as a non-root user.
 
 ### Health check
 
@@ -112,139 +171,3 @@ curl http://localhost:8000/health
 
 Backtest requests skip parameter optimization by default. Pass
 `skip_optimization=false` only for deliberate, resource-intensive optimization runs.
-
----
-
-## Project Structure
-
-```
-okane-finance-api/
-├── app/
-│   ├── main.py          # FastAPI entry point
-│   ├── signals/         # Trading signal logic
-│   ├── ai/              # AI/LLM integrations
-│   ├── news/            # News feed endpoints
-│   ├── ticker/          # Ticker data endpoints
-│   ├── notification/    # Push notification service
-│   ├── auth/            # Authentication
-│   ├── db/              # SQLAlchemy database models & repositories
-│   └── base/            # Shared models & interfaces
-├── tests/               # Pytest suite
-├── public/              # Static files
-├── vendor/              # Local wheel packages (pandas_ta)
-├── pyproject.toml       # ← single source of truth for deps
-├── uv.lock              # ← committed lock file
-├── .python-version      # ← pins Python 3.14
-└── Dockerfile           # ← 2-stage production build
-```
-
----
-
-## Trading Strategies
-
-This platform implements multiple algorithmic trading strategies for forex and other instruments. Strategies are located in `app/signals/strategies/`.
-
-### Available Strategies
-
-| Strategy | Description | Timeframe | Best For |
-|----------|-------------|-----------|----------|
-| `ema_bollinger` | EMA + Bollinger Bands crossover with RSI confirmation | Multiple | Forex, Stocks |
-| `ema_bollinger_1_low_risk` | Lower risk variant of EMA Bollinger strategy | Multiple | Risk-averse trading |
-| `macd_1` | MACD-based signals with multi-timeframe analysis | Multiple | Forex, Stocks, Trend-following |
-| `clf_bollinger_rsi` | Classifier with Bollinger Bands + RSI | Multiple | Crude Oil Futures |
-| `clf_bollinger_rsi_15m` | 15-minute variant of Bollinger + RSI classifier | 15m | Short-term trading |
-| `eurjpy_bollinger_rsi_60m` | EUR/JPY specific Bollinger + RSI strategy | 60m | EUR/JPY Forex |
-| `grid_trading` | Grid trading with ATR-based levels | Multiple | Ranging markets |
-| `super_safe_strategy` | Conservative multi-indicator approach (EMAs, BB, RSI, ADX, Volume) | Multiple | Conservative Forex |
-| `fvg_confirmation` | Fair Value Gap confirmation with 200 EMA trend filter | Multiple | Forex |
-| `swing-1` | Support/Resistance with candlestick pattern confirmation | Multiple | Swing trading |
-| `double_candle` | Consecutive candle pattern with volatility-adjusted sizing | Multiple | Trend continuation |
-| `mean_reversion_trend_filter` | Mean reversion with 4H trend filter and candle patterns | Multiple | Trend pullbacks |
-| `5_min_orb` | 5-min Opening Range Breakout — immediate entry | 5m | Forex (London/NY sessions) |
-| `5_min_orb_confirmation` | 5-min ORB with retest confirmation | 5m | Forex (London/NY sessions) |
-| `orb_autoresearch` | 30-min ORB with session-directional filter and narrow/wide classification | 30m | Forex (London/NY sessions) |
-
----
-
-## 5-Minute ORB Strategies
-
-Two session-based opening range breakout strategies for London and New York trading sessions.
-
-### Version A (`5_min_orb`)
-
-**Entry Style:** Immediate breakout entry (no retest required)
-
-**Trading Rules:**
-- Identify Opening Range: First 5-minute candle after session open
-- Long Entry: Candle closes above OR High → Enter next candle open
-- Short Entry: Candle closes below OR Low → Enter next candle open
-- Entry Filters:
-  - Don't chase if price moved >50% of OR size from breakout level
-  - Skip if breakout candle has wick > body (weak close)
-  - No entries after cutoff time (11:00 London / 12:00 NY)
-
-**Stop Loss:** Below OR Low (long) / Above OR High (short) + spread buffer
-
-**Take Profit:**
-- TP1 = 1× OR size (close 50%)
-- TP2 = 2× OR size (close remaining 50%)
-- Optional TP3 = 3× OR size (only if major S/R level aligns)
-
-**Sessions:**
-- London: 08:00-11:00 local time
-- New York: 09:30-12:00 local time
-
-**Instruments:** EUR/USD, GBP/USD, USD/JPY, EUR/GBP, GBP/JPY
-
-**Expected Performance:**
-- Win Rate: 40-55%
-- Trade Frequency: Higher (catches all breakouts)
-- Edge: Size of winners vs losers when move is genuine
-
-### Version B (`5_min_orb_confirmation`)
-
-**Entry Style:** Breakout with retest confirmation required
-
-**Three-Step Process:**
-1. Detect initial breakout (no entry yet)
-2. Wait for retest to OR level (within 2-3 pips)
-3. Enter on confirmation (candle close or rejection wick)
-
-**Confirmation Options:**
-- Option A: Candle touches OR level and closes back in breakout direction
-- Option B: Rejection wick at OR level (wick ≥ 2× body)
-
-**Stop Loss:** 3-5 pips from OR level (tighter, using OR as support/resistance)
-
-**Take Profit:**
-- TP1 = 1.5× OR size (close 50%)
-- TP2 = 2.5-3× OR size (close remaining 50%)
-
-**Missed Setups:** 30-40% of breakouts won't retest (by design)
-
-**Expected Performance:**
-- Win Rate: 55-65%
-- Trade Frequency: Lower (waits for retest)
-- Edge: Higher win rate from structural confirmation
-
-### Usage
-
-```python
-from app.signals.strategies.calculate import calculate_signals
-from app.signals.strategies.five_min_orb.five_min_orb_backtest import backtest as orb_a_backtest
-
-# Generate signals
-params = {'ticker': 'EUR/USD', 'session': 'london'}
-df_signals = five_min_orb_signals(df, params)
-
-# Run backtest
-bt, stats, trades, strategy_params = orb_a_backtest(df_signals, params, size=0.03, skip_optimization=True)
-```
-
-### Risk Management
-
-- Risk per trade: 0.5-1% of account
-- Max trades per session: 1 (no re-entry)
-- No opposite trades after stop hit (setup invalidated)
-
----
