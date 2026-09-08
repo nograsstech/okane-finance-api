@@ -6,21 +6,18 @@ Tests the complete flow from signal generation to backtest execution.
 
 import pytest
 import pandas as pd
-import importlib
 from datetime import UTC, datetime
 
-# Import Version A (immediate breakout)
-five_min_orb_signals = importlib.import_module("app.signals.strategies.5_min_orb.five_min_orb_signals")
-five_min_orb_backtest = importlib.import_module("app.signals.strategies.5_min_orb.five_min_orb_backtest")
-
-# Import Version B (retest confirmation)
-five_min_orb_confirmation_signals = importlib.import_module(
-    "app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_signals"
+from app.signals.strategies.five_min_orb.five_min_orb_backtest import (
+    backtest as five_min_orb_backtest,
 )
-five_min_orb_confirmation_backtest = importlib.import_module(
-    "app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_backtest"
+from app.signals.strategies.five_min_orb.five_min_orb_signals import five_min_orb_signals
+from app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_backtest import (
+    backtest as five_min_orb_confirmation_backtest,
 )
-
+from app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_signals import (
+    five_min_orb_confirmation_signals,
+)
 
 def create_sample_data(
     start_date: str = "2026-01-15 08:00:00",
@@ -242,7 +239,7 @@ class TestVersionAFullPipeline:
         )
 
         # Step 2: Generate signals
-        df_signals = five_min_orb_signals.five_min_orb_signals(
+        df_signals = five_min_orb_signals(
             df,
             parameters={"ticker": "EUR/USD", "session": "london"}
         )
@@ -255,7 +252,7 @@ class TestVersionAFullPipeline:
         assert 'TotalSignal' in df_signals.columns
 
         # Step 3: Run backtest (skip optimization for speed)
-        bt, stats, trades_actions, strategy_params = five_min_orb_backtest.backtest(
+        bt, stats, trades_actions, strategy_params = five_min_orb_backtest(
             df=df_signals,
             strategy_parameters={},
             size=0.03,
@@ -288,7 +285,7 @@ class TestVersionBFullPipeline:
         )
 
         # Step 2: Generate signals
-        df_signals = five_min_orb_confirmation_signals.five_min_orb_confirmation_signals(
+        df_signals = five_min_orb_confirmation_signals(
             df,
             parameters={"ticker": "EUR/USD", "session": "london"}
         )
@@ -301,7 +298,7 @@ class TestVersionBFullPipeline:
         assert 'TotalSignal' in df_signals.columns
 
         # Step 3: Run backtest (skip optimization for speed)
-        bt, stats, trades_actions, strategy_params = five_min_orb_confirmation_backtest.backtest(
+        bt, stats, trades_actions, strategy_params = five_min_orb_confirmation_backtest(
             df=df_signals,
             strategy_parameters={},
             size=0.03,
@@ -330,7 +327,7 @@ class TestOrbABreakoutScenario:
         df = create_breakout_scenario_data()
 
         # Generate signals
-        df_signals = five_min_orb_signals.five_min_orb_signals(
+        df_signals = five_min_orb_signals(
             df,
             parameters={"ticker": "EUR/USD", "session": "london"}
         )
@@ -350,7 +347,7 @@ class TestOrbABreakoutScenario:
         assert signal_candle['TotalSignal'] == 2  # Buy signal
 
         # Run backtest to verify execution
-        bt, stats, trades_actions, strategy_params = five_min_orb_backtest.backtest(
+        bt, stats, trades_actions, strategy_params = five_min_orb_backtest(
             df=df_signals,
             strategy_parameters={},
             size=0.03,
@@ -373,7 +370,7 @@ class TestOrbBRetestScenario:
         df = create_retest_scenario_data()
 
         # Generate signals
-        df_signals = five_min_orb_confirmation_signals.five_min_orb_confirmation_signals(
+        df_signals = five_min_orb_confirmation_signals(
             df,
             parameters={"ticker": "EUR/USD", "session": "london"}
         )
@@ -397,7 +394,7 @@ class TestOrbBRetestScenario:
         assert confirmation_candle['Low'] >= 1.0858  # Held above OR_High
 
         # Run backtest to verify execution
-        bt, stats, trades_actions, strategy_params = five_min_orb_confirmation_backtest.backtest(
+        bt, stats, trades_actions, strategy_params = five_min_orb_confirmation_backtest(
             df=df_signals,
             strategy_parameters={},
             size=0.03,
@@ -418,7 +415,7 @@ class TestOrbIntegrationEdgeCases:
         """Test Version A handles empty DataFrame gracefully."""
         df = pd.DataFrame()
 
-        bt, stats, trades_actions, strategy_params = five_min_orb_backtest.backtest(
+        bt, stats, trades_actions, strategy_params = five_min_orb_backtest(
             df=df,
             strategy_parameters={},
             size=0.03,
@@ -435,7 +432,7 @@ class TestOrbIntegrationEdgeCases:
         """Test Version B handles empty DataFrame gracefully."""
         df = pd.DataFrame()
 
-        bt, stats, trades_actions, strategy_params = five_min_orb_confirmation_backtest.backtest(
+        bt, stats, trades_actions, strategy_params = five_min_orb_confirmation_backtest(
             df=df,
             strategy_parameters={},
             size=0.03,
@@ -458,13 +455,13 @@ class TestOrbIntegrationEdgeCases:
             volatility=0.0002  # Low volatility, no breakout
         )
 
-        df_signals = five_min_orb_signals.five_min_orb_signals(
+        df_signals = five_min_orb_signals(
             df,
             parameters={"ticker": "EUR/USD", "session": "london"}
         )
 
         # Run backtest
-        bt, stats, trades_actions, strategy_params = five_min_orb_backtest.backtest(
+        bt, stats, trades_actions, strategy_params = five_min_orb_backtest(
             df=df_signals,
             strategy_parameters={},
             size=0.03,

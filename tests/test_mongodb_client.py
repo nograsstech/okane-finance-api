@@ -6,7 +6,7 @@ Uses mongomock-motor — no live MongoDB connection required.
 
 from __future__ import annotations
 
-import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -61,21 +61,46 @@ class TestMongoDBClient:
 
     async def test_find_with_filter(self, mock_mongo_db):
         col = mock_mongo_db["ticker_infos"]
-        await col.insert_many([
-            {"ticker": "AAPL", "sector": "Tech"},
-            {"ticker": "XOM", "sector": "Energy"},
-        ])
+        await col.insert_many(
+            [
+                {"ticker": "AAPL", "sector": "Tech"},
+                {"ticker": "XOM", "sector": "Energy"},
+            ]
+        )
         found = await col.find_one({"ticker": "XOM"})
         assert found["sector"] == "Energy"
 
-    async def test_db_name_from_env_var(self, monkeypatch):
-        """The correct database name is selected based on ENV env var."""
-        # We can't easily re-import the singleton, but we can verify the
-        # logic independently.
-        monkeypatch.setenv("ENV", "production")
-        db_name = "production" if os.environ.get("ENV") == "production" else "develop"
-        assert db_name == "production"
+    async def test_client_is_created_lazily_and_reused(self, monkeypatch):
+        from app.base.utils import mongodb
 
-        monkeypatch.setenv("ENV", "development")
-        db_name = "production" if os.environ.get("ENV") == "production" else "develop"
-        assert db_name == "develop"
+        created_uris: list[str] = []
+
+        class FakeClient:
+            def __init__(self, uri: str, **_kwargs):
+                created_uris.append(uri)
+
+            def __getitem__(self, name: str):
+                return {"database": name}
+
+        monkeypatch.setattr(mongodb, "_client", None)
+        monkeypatch.setattr(mongodb, "_database", None)
+        monkeypatch.setattr(mongodb, "AsyncIOMotorClient", FakeClient)
+        monkeypatch.setattr(
+            mongodb,
+            "get_settings",
+            lambda: SimpleNamespace(
+                mongo_user="user@example.com",
+                mongo_password="p@ss word",
+                environment="production",
+            ),
+        )
+
+        first = await mongodb.connect_mongodb()
+        second = await mongodb.connect_mongodb()
+
+        assert first is second
+        assert first == {"database": "production"}
+        assert created_uris == [
+            "mongodb+srv://user%40example.com:p%40ss+word"
+            "@develop.dkur4lg.mongodb.net/?retryWrites=true&w=majority"
+        ]

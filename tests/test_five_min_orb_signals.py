@@ -9,15 +9,12 @@ Tests Version A (immediate breakout entry) signal generation logic:
 - One trade per session (no re-entry)
 """
 
-import importlib
-
 import pandas as pd
 import pytest
 
-# Import from module with numeric name using importlib
-five_min_orb_signals = importlib.import_module("app.signals.strategies.5_min_orb.five_min_orb_signals")
-
-five_min_orb_signals_func = five_min_orb_signals.five_min_orb_signals
+from app.signals.strategies.five_min_orb.five_min_orb_signals import (
+    five_min_orb_signals as five_min_orb_signals_func,
+)
 
 
 class TestVersionASignalGeneration:

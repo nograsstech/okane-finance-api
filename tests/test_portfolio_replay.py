@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
+from app.signals import portfolio_replay as portfolio_replay_module
 from app.signals.dto import PortfolioReplayRequestDTO
 from app.signals.portfolio_replay import _replay_strategy, run_portfolio_replay
 
@@ -154,9 +155,7 @@ def test_daily_bar_does_not_override_close_before_bar_completion():
         _action("close", "2024-01-01 12:00", entry=None, price=105, sl=None, tp=None),
     ]
 
-    trades, _ = _replay_strategy(
-        _strategy(), actions, frame, 100, 0, bar_interval="1d"
-    )
+    trades, _ = _replay_strategy(_strategy(), actions, frame, 100, 0, bar_interval="1d")
 
     assert len(trades) == 1
     assert trades[0]["status"] == "close"
@@ -192,3 +191,45 @@ def test_full_replay_deduplicates_exact_actions(monkeypatch):
     assert response["data"]["summary"]["total_trades"] == 1
     assert response["data"]["summary"]["ending_equity"] == 10_195
     assert response["data"]["warnings"] == ["Removed 1 exact duplicate action(s)"]
+
+
+@pytest.mark.asyncio
+async def test_portfolio_replay_service_returns_a_typed_empty_portfolio(monkeypatch):
+    class SessionContext:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    class BacktestRepository:
+        def __init__(self, _session):
+            pass
+
+        async def get_enabled_for_portfolio_replay(self):
+            return []
+
+    class TradeRepository:
+        def __init__(self, _session):
+            pass
+
+        async def get_for_portfolio_replay(self, *_args):
+            return []
+
+    monkeypatch.setattr(portfolio_replay_module, "AsyncSessionLocal", SessionContext)
+    monkeypatch.setattr(
+        portfolio_replay_module,
+        "BacktestStatRepository",
+        BacktestRepository,
+    )
+    monkeypatch.setattr(
+        portfolio_replay_module,
+        "TradeActionRepository",
+        TradeRepository,
+    )
+
+    response = await portfolio_replay_module.portfolio_replay(_params())
+
+    assert response.status == 200
+    assert response.data.enabled_strategy_count == 0
+    assert response.data.summary.ending_equity == 10_000

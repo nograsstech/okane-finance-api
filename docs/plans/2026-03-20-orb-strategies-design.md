@@ -21,12 +21,12 @@ Both strategies target London (08:00 GMT+1) and New York (09:30 EST) session ope
 
 ```
 app/signals/strategies/
-├── 5_min_orb/
+├── five_min_orb/
 │   ├── __init__.py
 │   ├── 5_min_orb_signals.py          # TotalSignal generation (Version A)
 │   ├── 5_min_orb_backtest.py         # Strategy class & backtest (Version A)
 │   └── orb_utils.py                  # Shared utilities (timezone, session detection)
-├── 5_min_orb_confirmation/
+├── five_min_orb_confirmation/
 │   ├── __init__.py
 │   ├── 5_min_orb_confirmation_signals.py  # TotalSignal generation (Version B)
 │   └── 5_min_orb_confirmation_backtest.py # Strategy class & backtest (Version B)
@@ -370,8 +370,8 @@ class FiveMinORBConfirmationStrat(Strategy):
 
 ## References
 
-- **Version A Strategy:** `app/signals/strategies/5_min_orb/orb-strategy-version-a.md`
-- **Version B Strategy:** `app/signals/strategies/5_min_orb_confirmation/orb-strategy-version-b.md`
+- **Version A Strategy:** `app/signals/strategies/five_min_orb/orb-strategy-version-a.md`
+- **Version B Strategy:** `app/signals/strategies/five_min_orb_confirmation/orb-strategy-version-b.md`
 - **Existing Strategy Pattern:** `app/signals/strategies/ema_bollinger/`
 - **Backtesting Framework:** `backtesting.py` library
 

@@ -1,74 +1,86 @@
+from __future__ import annotations
+
 import asyncio
 from datetime import datetime
-import pytz
-import yfinance as yf
+from zoneinfo import ZoneInfo
+
 import pandas as pd
+import yfinance as yf
+
+type DateInput = str | datetime
 
 _YFINANCE_DOWNLOAD_TIMEOUT_SECONDS = 20
+_MARKET_TIMEZONE = ZoneInfo("Asia/Singapore")
 
-def get_dates(period):
-  utc = datetime.now(pytz.utc)
-  tz = pytz.timezone("Asia/Singapore")
-  sg = utc.astimezone(tz)
-  sg_datetime_index = pd.DatetimeIndex([sg])
-  today = sg_datetime_index[0]
-  start_date = today - pd.Timedelta(days=period - 1)
-  return today, start_date
 
-def getYFinanceData(ticker, interval, period=None, start=None, end=None):
-  """
-  Fetches financial data using the yfinance library.
+def get_dates(period_days: int) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Return the inclusive Singapore-market date range used by legacy callers."""
+    today = pd.Timestamp(datetime.now(_MARKET_TIMEZONE))
+    start_date = today - pd.Timedelta(days=period_days - 1)
+    return today, start_date
 
-  Args:
-    ticker (str): The ticker symbol of the stock or asset.
-    period (str): The time period for which to fetch the data. Must be in the format of "{number}d"
-    interval (str, optional): The time interval between data points. Can be '1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', or '3mo'. Defaults to None.
-    start (str, optional): The start date for the data in the format 'YYYY-MM-DD'. Defaults to None.
-    end (str, optional): The end date for the data in the format 'YYYY-MM-DD'. Defaults to None.
 
-  Returns:
-    pandas.DataFrame: The fetched financial data.
+def _period_days(period: str) -> int:
+    if not period.endswith("d"):
+        raise ValueError('period must use the "{number}d" format')
 
-  """
+    try:
+        days = int(period[:-1])
+    except ValueError as exc:
+        raise ValueError('period must use the "{number}d" format') from exc
 
-  # remove "d" from period
-  period = int(period[:-1])
-  end, start = get_dates(period)
+    if days < 1:
+        raise ValueError("period must be at least 1 day")
+    return days
 
-  dataF = yf.download(
-    tickers=ticker,
-    interval=interval,
-    start=start,
-    end=end,
-    multi_level_index=False,
-    auto_adjust=True,
-    timeout=_YFINANCE_DOWNLOAD_TIMEOUT_SECONDS,
-  )
 
-  dataF.iloc[:, :]
+def get_yfinance_data(
+    ticker: str,
+    interval: str,
+    period: str | None = None,
+    start: DateInput | None = None,
+    end: DateInput | None = None,
+) -> pd.DataFrame:
+    """Fetch and normalize OHLCV data from yfinance.
 
-  df = pd.DataFrame(dataF)
+    Explicit dates take precedence. When neither date is supplied, the function
+    retains the existing period-based date calculation used by strategy jobs.
+    """
+    resolved_start = start
+    resolved_end = end
+    if start is None and end is None:
+        if period is None:
+            raise ValueError("period is required when start and end are not provided")
+        resolved_end, resolved_start = get_dates(_period_days(period))
 
-  # use df index, convert DateTime to a column instead of index
-  df.reset_index(inplace=True)
+    downloaded = yf.download(
+        tickers=ticker,
+        interval=interval,
+        start=resolved_start,
+        end=resolved_end,
+        multi_level_index=False,
+        auto_adjust=True,
+        timeout=_YFINANCE_DOWNLOAD_TIMEOUT_SECONDS,
+    )
 
-  # rename Datetime to "Gmt time"
-  df = df.rename(columns={"Datetime": "Gmt time"})
+    frame = pd.DataFrame(downloaded).reset_index()
+    frame = frame.rename(columns={"Datetime": "Gmt time", "Date": "Gmt time"})
+    frame["Gmt time"] = pd.to_datetime(frame["Gmt time"])
+    frame.set_index("Gmt time", inplace=True)
+    return frame[frame["High"] != frame["Low"]]
 
-  # rename Date to "Gmt time"
-  df = df.rename(columns={"Date": "Gmt time"})
 
-  df["Gmt time"] = pd.to_datetime(df["Gmt time"], format="%d.%m.%Y %H:%M:%S")
-  df.set_index("Gmt time", inplace=True)
-  df = df[df.High != df.Low]
+async def get_yfinance_data_async(
+    ticker: str,
+    interval: str,
+    period: str | None = None,
+    start: DateInput | None = None,
+    end: DateInput | None = None,
+) -> pd.DataFrame:
+    """Run the blocking yfinance download outside the event loop."""
+    return await asyncio.to_thread(get_yfinance_data, ticker, interval, period, start, end)
 
-  return df
 
-async def getYFinanceDataAsync(ticker, interval, period=None, start=None, end=None):
-  """
-  Async wrapper around getYFinanceData.
-
-  Offloads the blocking yf.download() call to a thread so it doesn't block
-  the asyncio event loop.
-  """
-  return await asyncio.to_thread(getYFinanceData, ticker, interval, period, start, end)
+# Compatibility aliases for existing internal imports. New code uses snake_case.
+getYFinanceData = get_yfinance_data
+getYFinanceDataAsync = get_yfinance_data_async
