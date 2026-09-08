@@ -66,6 +66,7 @@ async def backtest(
         end=params.end,
         strategy_id=params.strategy_id,
         backtest_process_uuid=params.backtest_process_uuid,
+        skip_optimization=params.skip_optimization,
     )
     return str(backtest_process_uuid)
 
@@ -83,6 +84,7 @@ async def backtest_sync(
         parameters=params.parameters,
         start=params.start,
         end=params.end,
+        skip_optimization=params.skip_optimization,
     )
 
 

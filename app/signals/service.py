@@ -6,7 +6,6 @@ import math
 import os
 import warnings
 import zlib
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 from app.signals.constants import STRATEGY_DESCRIPTIONS
@@ -27,13 +26,12 @@ from app.db.repository import (
     TradeActionRepository,
     UniqueStrategyRepository,
 )
+from app.executors import BACKTEST_EXECUTOR
 from app.notification.service import send_trade_action_notification
 from app.signals.strategies.calculate import calculate_signals, calculate_signals_async
 from app.signals.strategies.perform_backtest import perform_backtest
 from app.signals.utils.signals import get_all_signals, get_latest_signal
 from app.signals.utils.yfinance import getYFinanceData, getYFinanceDataAsync
-
-executor = ThreadPoolExecutor(max_workers=5)
 
 REPLAY_TIMEOUT_SECONDS = 120
 
@@ -154,8 +152,9 @@ async def get_backtest_result(
         )
 
     try:
+        loop = asyncio.get_running_loop()
         bt, stats, trade_actions, strategy_parameters = await asyncio.wait_for(
-            asyncio.to_thread(_run_backtest),
+            loop.run_in_executor(BACKTEST_EXECUTOR, _run_backtest),
             timeout=600.0,  # 10-minute hard limit; optimization can be slow but not infinite
         )
         if bt is None or stats is None:

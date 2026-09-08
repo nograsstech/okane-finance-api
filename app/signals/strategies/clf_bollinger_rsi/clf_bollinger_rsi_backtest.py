@@ -1,8 +1,5 @@
 from backtesting import Strategy
 from backtesting import Backtest
-import multiprocessing as mp
-if mp.get_start_method(allow_none=True) != 'fork':
-    mp.set_start_method('fork', force=True)
 
 def backtest(df, strategy_parameters, size = 0.01, skip_optimization=False, best_params=None):
     dftest = df[:]
@@ -94,6 +91,8 @@ def backtest(df, strategy_parameters, size = 0.01, skip_optimization=False, best
 
         print(best_params)
     else:
+        if best_params is None:
+            best_params = {'TPcoef': 2, 'slcoef': 3}
         print("Optimization is skipped and best params provided", best_params)
         
     strategy_parameters = {

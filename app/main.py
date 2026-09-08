@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.base.interface import RootResponse
+from app.health import router as healthRouter
 from app.news.router import router as newsRouter
 from app.ticker.router import router as tickerRouter
 from app.signals.router import router as signalsRouter
@@ -41,6 +42,7 @@ app.include_router(tickerRouter)
 app.include_router(signalsRouter)
 app.include_router(aiRouter)
 app.include_router(notificationRouter)
+app.include_router(healthRouter)
 app.mount("/public", StaticFiles(directory="public"), name="public")
 app.mount("/logo", StaticFiles(directory="public"), name="public")
 
@@ -49,4 +51,3 @@ def read_root():
     return {"status": 200, "message": "Monii 0.1.0"}
 
 mount_chainlit(app=app, target="app/chainlit/chainlit.py", path="/chat")
-
