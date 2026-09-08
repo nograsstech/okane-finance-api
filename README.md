@@ -107,8 +107,11 @@ docker run -p 8000:8000 --env-file .env okane-finance-api
 ### Health check
 
 ```zsh
-curl http://localhost:8000/
+curl http://localhost:8000/health
 ```
+
+Backtest requests skip parameter optimization by default. Pass
+`skip_optimization=false` only for deliberate, resource-intensive optimization runs.
 
 ---
 

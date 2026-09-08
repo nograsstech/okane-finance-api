@@ -1,5 +1,7 @@
-import multiprocessing as mp
+from multiprocessing.dummy import Pool as ThreadPool
 
-# backtesting.py creates optimizer workers from request-handling threads. Forking
-# there can inherit locked uvicorn and asyncio state, so all strategy imports use spawn.
-mp.set_start_method("spawn", force=True)
+import backtesting
+
+# backtesting.py defaults to forking optimizer workers on Linux. Use its supported
+# pool override so optimization cannot inherit locked uvicorn and asyncio state.
+backtesting.Pool = ThreadPool

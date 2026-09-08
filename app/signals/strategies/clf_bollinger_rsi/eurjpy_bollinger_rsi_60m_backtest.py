@@ -91,6 +91,8 @@ def backtest(df, strategy_parameters, size = 0.03, skip_optimization=False, best
         
         print(best_params)
     else:
+        if best_params is None:
+            best_params = {'TPcoef': 2, 'slcoef': 3}
         print("Optimization is skipped and best params provided", best_params)
         
     strategy_parameters = {
