@@ -15,10 +15,8 @@ during testing even when DATABASE_URL is not yet set.
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncGenerator
 
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -26,7 +24,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-load_dotenv()
+from app.config import get_settings
 
 
 def _normalise_url(url: str) -> str:
@@ -37,7 +35,7 @@ def _normalise_url(url: str) -> str:
     """
     for prefix in ("postgresql+asyncpg://", "postgresql+asyncio://", "asyncpg://"):
         if url.startswith(prefix):
-            url = "postgresql+psycopg://" + url[len(prefix):]
+            url = "postgresql+psycopg://" + url[len(prefix) :]
             return url
     if url.startswith("postgres://"):
         return url.replace("postgres://", "postgresql+psycopg://", 1)
@@ -47,7 +45,7 @@ def _normalise_url(url: str) -> str:
 
 
 def _get_database_url() -> str:
-    raw = os.environ.get("DATABASE_URL", "")
+    raw = get_settings().database_url or ""
     if not raw:
         raise RuntimeError(
             "DATABASE_URL is not set. Add it to your .env file.\n"
@@ -108,7 +106,7 @@ class Base(DeclarativeBase):
     """Shared declarative base for all SQLAlchemy ORM models."""
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db() -> AsyncGenerator[AsyncSession]:
     """FastAPI dependency — yields one session per request."""
     async with _get_factory()() as session:
         yield session

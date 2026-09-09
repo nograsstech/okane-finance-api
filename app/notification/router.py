@@ -1,15 +1,10 @@
-from fastapi import APIRouter
-from fastapi.responses import Response
-from fastapi import Request
-import requests
-import os
 import json
-import logging
+import os
 
-# Load environment variables from .env file
-from dotenv import load_dotenv, find_dotenv
+import requests
+from dotenv import find_dotenv, load_dotenv
+from fastapi import APIRouter, Request
 
-from app.ai.service import get_chatbot_response_async
 load_dotenv(find_dotenv(), override=True)
 
 router = APIRouter(
@@ -23,6 +18,8 @@ async def test_discord_webhook(request: Request):
     return {"status": "Discord Webhook Online"}
 @router.post("/discord-webhook")
 async def receive_discord_message(request: Request):
+    from app.ai.service import get_chatbot_response_async
+
     data = await request.json()
 
     # Extract username and message content
@@ -86,7 +83,7 @@ async def receive_discord_message(request: Request):
             print(payload)
             print("Sending Discord notification chunk...")
             requests.post(url, headers=headers, data=json.dumps(payload))
-            print(f"Discord notification chunk sent successfully.")
+            print("Discord notification chunk sent successfully.")
     else:
         payload = {"content": str(chatbot_message)}
         if message_id != "": 
@@ -97,5 +94,5 @@ async def receive_discord_message(request: Request):
         print(payload)
         print("Sending Discord notification...")
         requests.post(url, headers=headers, data=json.dumps(payload))
-        print(f"Discord notification sent successfully.")
+        print("Discord notification sent successfully.")
     return {"status": "Message processed"}

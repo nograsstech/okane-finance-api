@@ -5,13 +5,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain.memory import ConversationBufferMemory
 from chainlit.types import ThreadDict
 from chainlit.input_widget import Select, Slider
-from app.ai.chatbot import (
-    create_chatbot_graph,
-    State,
-)  # Import the graph creation function and State
-from app.ai.models.gemini import (
-    create_gemini_flash_model,
-)  # Import the model creation function
+from chainlit.oauth_providers import get_configured_oauth_providers
 from langchain_core.messages import (
     HumanMessage,
     AIMessage,
@@ -24,6 +18,9 @@ async def setup_runnable(settings: Dict):
     """
     Sets up the LangGraph runnable with the selected LLM model.
     """
+    from app.ai.chatbot import create_chatbot_graph
+    from app.ai.models.gemini import create_gemini_flash_model
+
     # Retrieve model settings
     gemini_model_name = settings.get("Gemini_Model", "gemini-2.0-flash")
     gemini_temperature = settings.get("Gemini_Temperature", 1.0)  # Ensure float type
@@ -45,7 +42,6 @@ def auth():
     return cl.User(identifier="test")
 
 
-@cl.oauth_callback
 def oauth_callback(
     provider_id: str,
     token: str,
@@ -53,6 +49,10 @@ def oauth_callback(
     default_user: cl.User,
 ) -> Optional[cl.User]:
     return default_user
+
+
+if get_configured_oauth_providers():
+    cl.oauth_callback(oauth_callback)
 
 
 @cl.on_chat_start
@@ -169,7 +169,7 @@ async def on_message(message: cl.Message):
     res = cl.Message(content="")
 
     # Invoke the LangGraph graph
-    initial_state = State(messages=[HumanMessage(content=message.content)])
+    initial_state = {"messages": [HumanMessage(content=message.content)]}
 
     # Invoke the LangGraph graph to get the final state
     final_state = await runnable.ainvoke(

@@ -1,21 +1,14 @@
-"""
-MongoDB client — module-level singleton using motor (async).
-
-Instead of creating a new client on every request (the old behaviour),
-this module creates a single AsyncIOMotorClient at import time and caches
-the resolved Database object.  Callers continue to use connect_mongodb()
-for backward compatibility; it now simply returns the cached Database.
-"""
+"""Lazy process-wide MongoDB client used by news and ticker services."""
 
 from __future__ import annotations
 
-import os
+from urllib.parse import quote_plus
+
 import certifi
-from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.server_api import ServerApi
 
-load_dotenv()
+from app.config import get_settings
 
 COLLECTIONS = {
     "stock_lists": "stock_lists",
@@ -25,29 +18,31 @@ COLLECTIONS = {
     "ticker_infos": "ticker_infos",
 }
 
-# ---------------------------------------------------------------------------
-# Singleton client — created once at module import time.
-# ---------------------------------------------------------------------------
-_MONGO_URI = (
-    f"mongodb+srv://{os.environ.get('MONGO_USER')}:{os.environ.get('MONGO_PASSWORD')}"
-    f"@develop.dkur4lg.mongodb.net/?retryWrites=true&w=majority"
-)
+_client: AsyncIOMotorClient | None = None
+_database: AsyncIOMotorDatabase | None = None
 
-_client: AsyncIOMotorClient = AsyncIOMotorClient(
-    _MONGO_URI,
-    server_api=ServerApi("1"),
-    tlsCAFile=certifi.where(),
-)
 
-_db_name: str = "production" if os.environ.get("ENV") == "production" else "develop"
-_database = _client[_db_name]
+def _get_database() -> AsyncIOMotorDatabase:
+    global _client, _database
+    if _database is None:
+        settings = get_settings()
+        if settings.mongo_user is None or settings.mongo_password is None:
+            raise RuntimeError("MONGO_USER and MONGO_PASSWORD are not configured")
+        uri = (
+            f"mongodb+srv://{quote_plus(settings.mongo_user)}:"
+            f"{quote_plus(settings.mongo_password)}"
+            "@develop.dkur4lg.mongodb.net/?retryWrites=true&w=majority"
+        )
+        _client = AsyncIOMotorClient(
+            uri,
+            server_api=ServerApi("1"),
+            tlsCAFile=certifi.where(),
+        )
+        database_name = "production" if settings.environment == "production" else "develop"
+        _database = _client[database_name]
+    return _database
 
 
 async def connect_mongodb():
-    """
-    Return the cached Motor database instance.
-
-    Kept as an async function for full backward compatibility with all callers
-    that do ``db = await connect_mongodb()``.
-    """
-    return _database
+    """Return the cached database, creating the Motor client on first use."""
+    return _get_database()

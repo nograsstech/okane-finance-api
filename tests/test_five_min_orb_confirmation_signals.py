@@ -7,17 +7,12 @@ Tests Version B three-step process:
 3. Confirmation (Entry Trigger) - Generate signal on retest + confirmation
 """
 
-import importlib
-
 import pandas as pd
 import pytest
 
-# Import from module with numeric name using importlib
-five_min_orb_confirmation_signals = importlib.import_module(
-    "app.signals.strategies.5_min_orb_confirmation.five_min_orb_confirmation_signals"
+from app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_signals import (
+    five_min_orb_confirmation_signals as five_min_orb_confirmation_signals_func,
 )
-
-five_min_orb_confirmation_signals_func = five_min_orb_confirmation_signals.five_min_orb_confirmation_signals
 
 
 class TestVersionBSignalGeneration:

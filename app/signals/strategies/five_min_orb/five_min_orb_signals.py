@@ -12,7 +12,6 @@ Version A: Immediate breakout entry
 - One trade per session (no re-entry)
 """
 
-import importlib
 import logging
 from datetime import time, timezone
 from typing import Any, Dict, Optional
@@ -21,8 +20,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Import from module with numeric name using importlib
-orb_utils = importlib.import_module("app.signals.strategies.5_min_orb.orb_utils")
+from . import orb_utils
 
 convert_utc_to_session_time = orb_utils.convert_utc_to_session_time
 calculate_pip_value = orb_utils.calculate_pip_value

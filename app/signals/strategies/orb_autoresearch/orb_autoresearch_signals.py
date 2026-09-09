@@ -14,7 +14,6 @@ Key differences from 5_min_orb:
 - 0.1% breakout threshold (close must clear range by 0.1%)
 """
 
-import importlib
 import logging
 from datetime import timezone
 from typing import Any, Dict, Optional
@@ -23,7 +22,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-orb_utils = importlib.import_module("app.signals.strategies.5_min_orb.orb_utils")
+from ..five_min_orb import orb_utils
 calculate_pip_value = orb_utils.calculate_pip_value
 calculate_or_size_pips = orb_utils.calculate_or_size_pips
 

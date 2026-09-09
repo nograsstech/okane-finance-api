@@ -24,6 +24,7 @@ from app.signals.utils.yfinance import getYFinanceDataAsync
 _CONFIDENCE_HIGH = 70.0
 _CONFIDENCE_MEDIUM = 50.0
 
+
 # Per-interval HMM stability defaults.
 #
 # Design rationale (two axes):
@@ -39,30 +40,36 @@ _CONFIDENCE_MEDIUM = 50.0
 #     delayed by an overly strict gate.
 def _row(bull: float, bear: float, chop: float, dwell: int, margin: float) -> dict:
     return {
-        'p_stay_bull': bull, 'p_stay_bear': bear, 'p_stay_chop': chop,
-        'min_dwell': dwell, 'switch_margin': margin,
+        "p_stay_bull": bull,
+        "p_stay_bear": bear,
+        "p_stay_chop": chop,
+        "min_dwell": dwell,
+        "switch_margin": margin,
     }
 
 
 _INTERVAL_DEFAULTS: dict[str, dict] = {
-    '1m':  _row(0.97, 0.97, 0.88, 30, 30.0),
-    '2m':  _row(0.96, 0.96, 0.86, 20, 28.0),
-    '5m':  _row(0.95, 0.95, 0.84, 15, 28.0),
-    '15m': _row(0.94, 0.94, 0.82, 10, 26.0),
-    '30m': _row(0.93, 0.93, 0.80,  8, 24.0),
-    '60m': _row(0.92, 0.92, 0.78, 10, 22.0),
-    '90m': _row(0.91, 0.91, 0.77,  8, 20.0),
-    '1h':  _row(0.92, 0.92, 0.78, 10, 22.0),
-    '2h':  _row(0.90, 0.90, 0.76,  6, 18.0),
-    '4h':  _row(0.80, 0.80, 0.66,  3,  8.0),
-    '1d':  _row(0.68, 0.68, 0.56,  2,  5.0),
-    '5d':  _row(0.62, 0.62, 0.52,  1,  4.0),
-    '1wk': _row(0.58, 0.58, 0.48,  1,  3.0),
-    '1mo': _row(0.55, 0.55, 0.45,  1,  2.0),
+    "1m": _row(0.97, 0.97, 0.88, 30, 30.0),
+    "2m": _row(0.96, 0.96, 0.86, 20, 28.0),
+    "5m": _row(0.95, 0.95, 0.84, 15, 28.0),
+    "15m": _row(0.94, 0.94, 0.82, 10, 26.0),
+    "30m": _row(0.93, 0.93, 0.80, 8, 24.0),
+    "60m": _row(0.92, 0.92, 0.78, 10, 22.0),
+    "90m": _row(0.91, 0.91, 0.77, 8, 20.0),
+    "1h": _row(0.92, 0.92, 0.78, 10, 22.0),
+    "2h": _row(0.90, 0.90, 0.76, 6, 18.0),
+    "4h": _row(0.80, 0.80, 0.66, 3, 8.0),
+    "1d": _row(0.68, 0.68, 0.56, 2, 5.0),
+    "5d": _row(0.62, 0.62, 0.52, 1, 4.0),
+    "1wk": _row(0.58, 0.58, 0.48, 1, 3.0),
+    "1mo": _row(0.55, 0.55, 0.45, 1, 2.0),
 }
 _FALLBACK_DEFAULTS: dict = {
-    'p_stay_bull': 0.85, 'p_stay_bear': 0.85, 'p_stay_chop': 0.70,
-    'min_dwell': 3, 'switch_margin': 12.0,
+    "p_stay_bull": 0.85,
+    "p_stay_bear": 0.85,
+    "p_stay_chop": 0.70,
+    "min_dwell": 3,
+    "switch_margin": 12.0,
 }
 
 
@@ -77,11 +84,11 @@ def _effective_params(
     """Resolve HMM stability params: use user-supplied value or auto-scale from interval."""
     auto = _INTERVAL_DEFAULTS.get(interval, _FALLBACK_DEFAULTS)
     return {
-        'p_stay_bull':   p_stay_bull   if p_stay_bull   is not None else auto['p_stay_bull'],
-        'p_stay_bear':   p_stay_bear   if p_stay_bear   is not None else auto['p_stay_bear'],
-        'p_stay_chop':   p_stay_chop   if p_stay_chop   is not None else auto['p_stay_chop'],
-        'min_dwell':     min_dwell     if min_dwell     is not None else auto['min_dwell'],
-        'switch_margin': switch_margin if switch_margin is not None else auto['switch_margin'],
+        "p_stay_bull": p_stay_bull if p_stay_bull is not None else auto["p_stay_bull"],
+        "p_stay_bear": p_stay_bear if p_stay_bear is not None else auto["p_stay_bear"],
+        "p_stay_chop": p_stay_chop if p_stay_chop is not None else auto["p_stay_chop"],
+        "min_dwell": min_dwell if min_dwell is not None else auto["min_dwell"],
+        "switch_margin": switch_margin if switch_margin is not None else auto["switch_margin"],
     }
 
 
@@ -164,32 +171,32 @@ async def get_hmm_regime_data(
     regime_data: list[HMMRegimeDataPoint] = []
 
     for i, (timestamp, row) in enumerate(df.iterrows()):
-        bars_in = int(row['bars_in_regime'])
+        bars_in = int(row["bars_in_regime"])
         start_idx = max(0, i - bars_in + 1)
         regime_start_ts = timestamps[start_idx].isoformat()
 
         regime_data.append(
             HMMRegimeDataPoint(
                 timestamp=timestamp.isoformat(),
-                close=float(row['Close']),
-                obs_momentum=float(row['obs_momentum']),
-                obs_volatility=float(row['obs_volatility']),
-                obs_rsi=float(row['obs_rsi']),
+                close=float(row["Close"]),
+                obs_momentum=float(row["obs_momentum"]),
+                obs_volatility=float(row["obs_volatility"]),
+                obs_rsi=float(row["obs_rsi"]),
                 # Causal filtered
-                prob_bull=float(row['prob_bull']),
-                prob_bear=float(row['prob_bear']),
-                prob_chop=float(row['prob_chop']),
+                prob_bull=float(row["prob_bull"]),
+                prob_bear=float(row["prob_bear"]),
+                prob_chop=float(row["prob_chop"]),
                 # Smoothed
-                prob_bull_smoothed=float(row['prob_bull_smoothed']),
-                prob_bear_smoothed=float(row['prob_bear_smoothed']),
-                prob_chop_smoothed=float(row['prob_chop_smoothed']),
+                prob_bull_smoothed=float(row["prob_bull_smoothed"]),
+                prob_bear_smoothed=float(row["prob_bear_smoothed"]),
+                prob_chop_smoothed=float(row["prob_chop_smoothed"]),
                 # Regime label
-                dominant_regime=str(row['regime']),
-                regime_state=int(row['regime_state']),
+                dominant_regime=DominantRegime(str(row["regime"])),
+                regime_state=int(row["regime_state"]),
                 # Confidence
-                confidence_score=float(row['confidence']),
-                confidence_entropy=float(row['confidence_entropy']),
-                confidence_margin=float(row['confidence_margin']),
+                confidence_score=float(row["confidence"]),
+                confidence_entropy=float(row["confidence_entropy"]),
+                confidence_margin=float(row["confidence_margin"]),
                 # Duration
                 bars_in_regime=bars_in,
                 regime_start=regime_start_ts,

@@ -32,14 +32,12 @@ Option B - Rejection Wick:
 - Signal AT rejection candle close
 """
 
-import importlib
-from datetime import UTC, time
+from datetime import UTC
 from typing import Any
 
 import pandas as pd
 
-# Import from module with numeric name using importlib
-orb_utils = importlib.import_module("app.signals.strategies.5_min_orb.orb_utils")
+from ..five_min_orb import orb_utils
 
 convert_utc_to_session_time = orb_utils.convert_utc_to_session_time
 calculate_pip_value = orb_utils.calculate_pip_value
@@ -144,8 +142,6 @@ def five_min_orb_confirmation_signals(
 
     # Process each candle
     for idx, row in df.iterrows():
-        # Convert to session local time
-        local_time = convert_utc_to_session_time(idx, session)
         date_str = idx.strftime('%Y-%m-%d')
 
         # Initialize state for new date

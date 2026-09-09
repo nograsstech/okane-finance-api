@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>okane-finance-api · codebase map</title>
+<style>
+  :root {
+    --ink: #0b0f14;
+    --panel: #10161e;
+    --hairline: rgba(148, 163, 184, 0.14);
+    --text: #cbd5e1;
+    --text-dim: #64748b;
+    --accent: #5eead4;
+    --c-entry: #e2e8f0;
+    --c-router: #5eead4;
+    --c-service: #f5c542;
+    --c-strategy: #f472b6;
+    --c-data: #7dd3fc;
+    --c-market: #a3e635;
+    --c-other: #94a3b8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    font-size: 13px;
+    overflow: hidden;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--hairline) 1px, transparent 1px),
+      linear-gradient(90deg, var(--hairline) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+  }
+  header {
+    position: fixed; top: 0; left: 0; right: 0; height: 52px;
+    display: flex; align-items: center; gap: 20px;
+    padding: 0 20px;
+    background: rgba(11, 15, 20, 0.92);
+    border-bottom: 1px solid var(--hairline);
+    z-index: 10;
+    backdrop-filter: blur(4px);
+  }
+  h1 {
+    font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
+    color: var(--c-entry); white-space: nowrap;
+  }
+  h1 span { color: var(--text-dim); font-weight: 400; }
+  #search {
+    flex: 0 1 340px;
+    background: var(--panel); border: 1px solid var(--hairline);
+    color: var(--text); padding: 7px 12px; border-radius: 3px;
+    font: inherit; outline: none;
+  }
+  #search:focus { border-color: var(--accent); }
+  #stats { margin-left: auto; color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+  #graph { position: fixed; inset: 52px 0 0 0; z-index: 1; cursor: grab; }
+  #graph:active { cursor: grabbing; }
+
+  #legend {
+    position: fixed; left: 20px; bottom: 20px; z-index: 10;
+    background: rgba(16, 22, 30, 0.92); border: 1px solid var(--hairline);
+    border-radius: 4px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .legend-row {
+    display: flex; align-items: center; gap: 9px;
+    cursor: pointer; user-select: none; color: var(--text-dim);
+  }
+  .legend-row.off { opacity: 0.35; text-decoration: line-through; }
+  .legend-row .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .legend-row .count { margin-left: auto; padding-left: 12px; font-size: 10px; }
+
+  #flow {
+    position: fixed; left: 20px; top: 72px; z-index: 10;
+    background: rgba(16, 22, 30, 0.92); border: 1px solid var(--hairline);
+    border-radius: 4px; padding: 12px 14px; max-width: 300px;
+  }
+  #flow h2 { font-size: 10px; color: var(--text-dim); letter-spacing: 0.14em; margin-bottom: 8px; font-weight: 600; }
+  .flow-line { display: flex; align-items: center; gap: 6px; padding: 2px 0; flex-wrap: wrap; }
+  .flow-node { padding: 2px 7px; border: 1px solid var(--hairline); border-radius: 3px; white-space: nowrap; }
+  .flow-arrow { color: var(--text-dim); }
+  .fn-router { color: var(--c-router); border-color: rgba(94,234,212,0.4); }
+  .fn-service { color: var(--c-service); border-color: rgba(245,197,66,0.4); }
+  .fn-strategy { color: var(--c-strategy); border-color: rgba(244,114,182,0.4); }
+  .fn-data { color: var(--c-data); border-color: rgba(125,211,252,0.4); }
+  .fn-market { color: var(--c-market); border-color: rgba(163,230,53,0.4); }
+
+  #detail {
+    position: fixed; right: 0; top: 52px; bottom: 0; width: 360px; z-index: 20;
+    background: var(--panel); border-left: 1px solid var(--hairline);
+    transform: translateX(100%); transition: transform 0.22s ease;
+    padding: 20px; overflow-y: auto;
+  }
+  #detail.open { transform: translateX(0); }
+  #detail .close {
+    position: absolute; top: 12px; right: 14px; cursor: pointer;
+    color: var(--text-dim); font-size: 16px; background: none; border: none;
+  }
+  #detail h3 { color: var(--accent); font-size: 14px; word-break: break-all; margin-bottom: 4px; padding-right: 24px; }
+  #detail .path { color: var(--text-dim); font-size: 11px; margin-bottom: 14px; word-break: break-all; }
+  #detail .loc { font-size: 11px; color: var(--text-dim); margin-bottom: 16px; }
+  #detail .loc b { color: var(--text); }
+  #detail h4 { font-size: 10px; letter-spacing: 0.14em; color: var(--text-dim); margin: 18px 0 8px; }
+  #detail .note {
+    background: rgba(94, 234, 212, 0.06); border-left: 2px solid var(--accent);
+    padding: 8px 10px; color: var(--text); line-height: 1.55; font-size: 12px;
+  }
+  .dep-list { display: flex; flex-direction: column; gap: 3px; }
+  .dep-list .dep {
+    color: var(--text); cursor: pointer; padding: 3px 6px; border-radius: 3px;
+    font-size: 12px; word-break: break-all;
+  }
+  .dep-list .dep:hover { background: rgba(94, 234, 212, 0.08); color: var(--accent); }
+  .dep-list .none { color: var(--text-dim); font-style: italic; }
+
+  .node circle { stroke: var(--ink); stroke-width: 1.5; cursor: pointer; }
+  .node text {
+    fill: var(--text-dim); font-size: 10px; cursor: pointer;
+    font-family: inherit;
+  }
+  .node.selected circle { stroke: #fff; stroke-width: 2; }
+  .node.selected text { fill: #fff; font-weight: 600; }
+  .node.dimmed { opacity: 0.12; }
+  .edge { stroke: rgba(148, 163, 184, 0.22); stroke-width: 1; fill: none; }
+  .edge.hl { stroke: var(--accent); stroke-width: 1.6; opacity: 1; }
+  .edge.dimmed { opacity: 0.04; }
+  .node.hub text { font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>okane-finance-api <span>· module graph</span></h1>
+  <input id="search" type="text" placeholder="filter modules… (e.g. orb, service, db)" autocomplete="off">
+  <div id="stats"></div>
+</header>
+
+<div id="flow">
+  <h2>REQUEST FLOW</h2>
+  <div class="flow-line">
+    <span class="flow-node">HTTP + basic auth</span><span class="flow-arrow">→</span>
+    <span class="flow-node fn-router">router.py</span><span class="flow-arrow">→</span>
+    <span class="flow-node fn-service">services/*</span>
+  </div>
+  <div class="flow-line">
+    <span class="flow-arrow">├→</span><span class="flow-node fn-strategy">calculate / perform_backtest</span>
+  </div>
+  <div class="flow-line">
+    <span class="flow-arrow">├→</span><span class="flow-node fn-market">utils/yfinance</span>
+  </div>
+  <div class="flow-line">
+    <span class="flow-arrow">└→</span><span class="flow-node fn-data">db/repository → postgres</span>
+  </div>
+</div>
+
+<div id="legend"></div>
+<svg id="graph"></svg>
+
+<aside id="detail">
+  <button class="close" onclick="selectNode(null)">×</button>
+  <h3 id="d-name"></h3>
+  <div class="path" id="d-path"></div>
+  <div class="loc" id="d-loc"></div>
+  <div class="note" id="d-note" style="display:none"></div>
+  <h4>IMPORTS</h4>
+  <div class="dep-list" id="d-out"></div>
+  <h4>IMPORTED BY</h4>
+  <div class="dep-list" id="d-in"></div>
+</aside>
+
+<script>
+const GRAPH = {
+ "nodes": [
+  {
+   "id": "app.config",
+   "path": "app/config.py",
+   "loc": 45
+  },
+  {
+   "id": "app.health",
+   "path": "app/health.py",
+   "loc": 24
+  },
+  {
+   "id": "app",
+   "path": "app/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.executors",
+   "path": "app/executors.py",
+   "loc": 3
+  },
+  {
+   "id": "app.main",
+   "path": "app/main.py",
+   "loc": 63
+  },
+  {
+   "id": "app.bots.discord_bot",
+   "path": "app/bots/discord_bot.py",
+   "loc": 47
+  },
+  {
+   "id": "app.chainlit.chainlit",
+   "path": "app/chainlit/chainlit.py",
+   "loc": 220
+  },
+  {
+   "id": "app.auth",
+   "path": "app/auth/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.auth.basic_auth",
+   "path": "app/auth/basic_auth.py",
+   "loc": 36
+  },
+  {
+   "id": "app.notification.service",
+   "path": "app/notification/service.py",
+   "loc": 132
+  },
+  {
+   "id": "app.notification",
+   "path": "app/notification/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.notification.router",
+   "path": "app/notification/router.py",
+   "loc": 98
+  },
+  {
+   "id": "app.signals.service",
+   "path": "app/signals/service.py",
+   "loc": 25
+  },
+  {
+   "id": "app.signals",
+   "path": "app/signals/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.portfolio_replay",
+   "path": "app/signals/portfolio_replay.py",
+   "loc": 465
+  },
+  {
+   "id": "app.signals.router",
+   "path": "app/signals/router.py",
+   "loc": 184
+  },
+  {
+   "id": "app.signals.dto",
+   "path": "app/signals/dto.py",
+   "loc": 234
+  },
+  {
+   "id": "app.signals.hmm_service",
+   "path": "app/signals/hmm_service.py",
+   "loc": 295
+  },
+  {
+   "id": "app.signals.hmm_dto",
+   "path": "app/signals/hmm_dto.py",
+   "loc": 189
+  },
+  {
+   "id": "app.signals.strategies.calculate",
+   "path": "app/signals/strategies/calculate.py",
+   "loc": 79
+  },
+  {
+   "id": "app.signals.strategies",
+   "path": "app/signals/strategies/__init__.py",
+   "loc": 7
+  },
+  {
+   "id": "app.signals.strategies.strategy_list",
+   "path": "app/signals/strategies/strategy_list.py",
+   "loc": 29
+  },
+  {
+   "id": "app.signals.strategies.perform_backtest",
+   "path": "app/signals/strategies/perform_backtest.py",
+   "loc": 113
+  },
+  {
+   "id": "app.signals.strategies.forex_fvg_respected",
+   "path": "app/signals/strategies/forex_fvg_respected/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.strategies.forex_fvg_respected.fvg_confirmation",
+   "path": "app/signals/strategies/forex_fvg_respected/fvg_confirmation.py",
+   "loc": 104
+  },
+  {
+   "id": "app.signals.strategies.forex_fvg_respected.fvg_confirmation_backtest",
+   "path": "app/signals/strategies/forex_fvg_respected/fvg_confirmation_backtest.py",
+   "loc": 166
+  },
+  {
+   "id": "app.signals.strategies.super_safe_strategy.super_safe_strategy",
+   "path": "app/signals/strategies/super_safe_strategy/super_safe_strategy.py",
+   "loc": 93
+  },
+  {
+   "id": "app.signals.strategies.super_safe_strategy.super_safe_strategy_backtest",
+   "path": "app/signals/strategies/super_safe_strategy/super_safe_strategy_backtest.py",
+   "loc": 339
+  },
+  {
+   "id": "app.signals.strategies.clf_bollinger_rsi.eurjpy_bollinger_rsi_60m_backtest",
+   "path": "app/signals/strategies/clf_bollinger_rsi/eurjpy_bollinger_rsi_60m_backtest.py",
+   "loc": 114
+  },
+  {
+   "id": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_backtest",
+   "path": "app/signals/strategies/clf_bollinger_rsi/clf_bollinger_rsi_backtest.py",
+   "loc": 114
+  },
+  {
+   "id": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_15m",
+   "path": "app/signals/strategies/clf_bollinger_rsi/clf_bollinger_rsi_15m.py",
+   "loc": 58
+  },
+  {
+   "id": "app.signals.strategies.clf_bollinger_rsi.eurjpy_bollinger_rsi_60m",
+   "path": "app/signals/strategies/clf_bollinger_rsi/eurjpy_bollinger_rsi_60m.py",
+   "loc": 58
+  },
+  {
+   "id": "app.signals.strategies.clf_bollinger_rsi",
+   "path": "app/signals/strategies/clf_bollinger_rsi/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi",
+   "path": "app/signals/strategies/clf_bollinger_rsi/clf_bollinger_rsi.py",
+   "loc": 58
+  },
+  {
+   "id": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_backtest_15m",
+   "path": "app/signals/strategies/clf_bollinger_rsi/clf_bollinger_rsi_backtest_15m.py",
+   "loc": 116
+  },
+  {
+   "id": "app.signals.strategies.mean_reversion_trend_filter.mean_reversion_trend_filter_backtest",
+   "path": "app/signals/strategies/mean_reversion_trend_filter/mean_reversion_trend_filter_backtest.py",
+   "loc": 257
+  },
+  {
+   "id": "app.signals.strategies.mean_reversion_trend_filter.mean_reversion_trend_filter_signals",
+   "path": "app/signals/strategies/mean_reversion_trend_filter/mean_reversion_trend_filter_signals.py",
+   "loc": 626
+  },
+  {
+   "id": "app.signals.strategies.mean_reversion_trend_filter",
+   "path": "app/signals/strategies/mean_reversion_trend_filter/__init__.py",
+   "loc": 30
+  },
+  {
+   "id": "app.signals.strategies.grid_trading.grid_trading_backtest",
+   "path": "app/signals/strategies/grid_trading/grid_trading_backtest.py",
+   "loc": 254
+  },
+  {
+   "id": "app.signals.strategies.grid_trading",
+   "path": "app/signals/strategies/grid_trading/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.strategies.grid_trading.grid_trading",
+   "path": "app/signals/strategies/grid_trading/grid_trading.py",
+   "loc": 14
+  },
+  {
+   "id": "app.signals.strategies.macd_1",
+   "path": "app/signals/strategies/macd_1/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.strategies.macd_1.macd_1",
+   "path": "app/signals/strategies/macd_1/macd_1.py",
+   "loc": 96
+  },
+  {
+   "id": "app.signals.strategies.macd_1.macd_1_backtest",
+   "path": "app/signals/strategies/macd_1/macd_1_backtest.py",
+   "loc": 205
+  },
+  {
+   "id": "app.signals.strategies.five_min_orb_confirmation",
+   "path": "app/signals/strategies/five_min_orb_confirmation/__init__.py",
+   "loc": 29
+  },
+  {
+   "id": "app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_backtest",
+   "path": "app/signals/strategies/five_min_orb_confirmation/five_min_orb_confirmation_backtest.py",
+   "loc": 242
+  },
+  {
+   "id": "app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_signals",
+   "path": "app/signals/strategies/five_min_orb_confirmation/five_min_orb_confirmation_signals.py",
+   "loc": 333
+  },
+  {
+   "id": "app.signals.strategies.double_candle.double_candle_signals",
+   "path": "app/signals/strategies/double_candle/double_candle_signals.py",
+   "loc": 109
+  },
+  {
+   "id": "app.signals.strategies.double_candle",
+   "path": "app/signals/strategies/double_candle/__init__.py",
+   "loc": 4
+  },
+  {
+   "id": "app.signals.strategies.double_candle.double_candle_backtest",
+   "path": "app/signals/strategies/double_candle/double_candle_backtest.py",
+   "loc": 202
+  },
+  {
+   "id": "app.signals.strategies.swing_1.swing",
+   "path": "app/signals/strategies/swing_1/swing.py",
+   "loc": 516
+  },
+  {
+   "id": "app.signals.strategies.swing_1.swing_signals",
+   "path": "app/signals/strategies/swing_1/swing_signals.py",
+   "loc": 278
+  },
+  {
+   "id": "app.signals.strategies.swing_1.constants",
+   "path": "app/signals/strategies/swing_1/constants.py",
+   "loc": 126
+  },
+  {
+   "id": "app.signals.strategies.swing_1",
+   "path": "app/signals/strategies/swing_1/__init__.py",
+   "loc": 5
+  },
+  {
+   "id": "app.signals.strategies.swing_1.swing_backtest",
+   "path": "app/signals/strategies/swing_1/swing_backtest.py",
+   "loc": 173
+  },
+  {
+   "id": "app.signals.strategies.swing_1.risk_manager",
+   "path": "app/signals/strategies/swing_1/risk_manager.py",
+   "loc": 75
+  },
+  {
+   "id": "app.signals.strategies.five_min_orb.five_min_orb_signals",
+   "path": "app/signals/strategies/five_min_orb/five_min_orb_signals.py",
+   "loc": 337
+  },
+  {
+   "id": "app.signals.strategies.five_min_orb",
+   "path": "app/signals/strategies/five_min_orb/__init__.py",
+   "loc": 26
+  },
+  {
+   "id": "app.signals.strategies.five_min_orb.orb_utils",
+   "path": "app/signals/strategies/five_min_orb/orb_utils.py",
+   "loc": 299
+  },
+  {
+   "id": "app.signals.strategies.five_min_orb.five_min_orb_backtest",
+   "path": "app/signals/strategies/five_min_orb/five_min_orb_backtest.py",
+   "loc": 265
+  },
+  {
+   "id": "app.signals.strategies.orb_autoresearch.orb_autoresearch_backtest",
+   "path": "app/signals/strategies/orb_autoresearch/orb_autoresearch_backtest.py",
+   "loc": 272
+  },
+  {
+   "id": "app.signals.strategies.orb_autoresearch",
+   "path": "app/signals/strategies/orb_autoresearch/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.strategies.orb_autoresearch.orb_autoresearch_signals",
+   "path": "app/signals/strategies/orb_autoresearch/orb_autoresearch_signals.py",
+   "loc": 228
+  },
+  {
+   "id": "app.signals.strategies.ema_bollinger_1_low_risk.ema_bollinger_1_low_risk_backtest",
+   "path": "app/signals/strategies/ema_bollinger_1_low_risk/ema_bollinger_1_low_risk_backtest.py",
+   "loc": 184
+  },
+  {
+   "id": "app.signals.strategies.ema_bollinger_1_low_risk.ema_bollinger_1_low_risk",
+   "path": "app/signals/strategies/ema_bollinger_1_low_risk/ema_bollinger_1_low_risk.py",
+   "loc": 31
+  },
+  {
+   "id": "app.signals.strategies.ema_bollinger_1_low_risk",
+   "path": "app/signals/strategies/ema_bollinger_1_low_risk/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.strategies.replay.predefined_trade_strategy",
+   "path": "app/signals/strategies/replay/predefined_trade_strategy.py",
+   "loc": 205
+  },
+  {
+   "id": "app.signals.strategies.replay",
+   "path": "app/signals/strategies/replay/__init__.py",
+   "loc": 3
+  },
+  {
+   "id": "app.signals.strategies.ema_bollinger.ema_bollinger_backtest",
+   "path": "app/signals/strategies/ema_bollinger/ema_bollinger_backtest.py",
+   "loc": 184
+  },
+  {
+   "id": "app.signals.strategies.ema_bollinger",
+   "path": "app/signals/strategies/ema_bollinger/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.signals.strategies.ema_bollinger.ema_bollinger",
+   "path": "app/signals/strategies/ema_bollinger/ema_bollinger.py",
+   "loc": 31
+  },
+  {
+   "id": "app.signals.signals_generator.ema_signals",
+   "path": "app/signals/signals_generator/ema_signals.py",
+   "loc": 15
+  },
+  {
+   "id": "app.signals.signals_generator.macd_signal_1",
+   "path": "app/signals/signals_generator/macd_signal_1.py",
+   "loc": 18
+  },
+  {
+   "id": "app.signals.signals_generator.rsi_signals_windowed",
+   "path": "app/signals/signals_generator/rsi_signals_windowed.py",
+   "loc": 13
+  },
+  {
+   "id": "app.signals.signals_generator.hmm_signals",
+   "path": "app/signals/signals_generator/hmm_signals.py",
+   "loc": 569
+  },
+  {
+   "id": "app.signals.utils.signals",
+   "path": "app/signals/utils/signals.py",
+   "loc": 22
+  },
+  {
+   "id": "app.signals.utils.yfinance",
+   "path": "app/signals/utils/yfinance.py",
+   "loc": 86
+  },
+  {
+   "id": "app.signals.services.signals",
+   "path": "app/signals/services/signals.py",
+   "loc": 88
+  },
+  {
+   "id": "app.signals.services.backtests",
+   "path": "app/signals/services/backtests.py",
+   "loc": 284
+  },
+  {
+   "id": "app.signals.services.results",
+   "path": "app/signals/services/results.py",
+   "loc": 127
+  },
+  {
+   "id": "app.signals.services",
+   "path": "app/signals/services/__init__.py",
+   "loc": 1
+  },
+  {
+   "id": "app.signals.services.strategy_jobs",
+   "path": "app/signals/services/strategy_jobs.py",
+   "loc": 83
+  },
+  {
+   "id": "app.signals.services.replay",
+   "path": "app/signals/services/replay.py",
+   "loc": 127
+  },
+  {
+   "id": "app.news.service",
+   "path": "app/news/service.py",
+   "loc": 186
+  },
+  {
+   "id": "app.news",
+   "path": "app/news/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.news.router",
+   "path": "app/news/router.py",
+   "loc": 32
+  },
+  {
+   "id": "app.news.dto",
+   "path": "app/news/dto.py",
+   "loc": 41
+  },
+  {
+   "id": "app.ai.service",
+   "path": "app/ai/service.py",
+   "loc": 89
+  },
+  {
+   "id": "app.ai",
+   "path": "app/ai/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.ai.chatbot",
+   "path": "app/ai/chatbot.py",
+   "loc": 516
+  },
+  {
+   "id": "app.ai.router",
+   "path": "app/ai/router.py",
+   "loc": 177
+  },
+  {
+   "id": "app.ai.sentiment_analyzer",
+   "path": "app/ai/sentiment_analyzer.py",
+   "loc": 56
+  },
+  {
+   "id": "app.ai.tools.get_yfinance_news",
+   "path": "app/ai/tools/get_yfinance_news.py",
+   "loc": 10
+  },
+  {
+   "id": "app.ai.tools.news_sentiment",
+   "path": "app/ai/tools/news_sentiment.py",
+   "loc": 10
+  },
+  {
+   "id": "app.ai.tools.duckduckgo_search",
+   "path": "app/ai/tools/duckduckgo_search.py",
+   "loc": 5
+  },
+  {
+   "id": "app.ai.models",
+   "path": "app/ai/models/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.ai.models.gemini",
+   "path": "app/ai/models/gemini.py",
+   "loc": 64
+  },
+  {
+   "id": "app.ticker.service",
+   "path": "app/ticker/service.py",
+   "loc": 112
+  },
+  {
+   "id": "app.ticker",
+   "path": "app/ticker/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.ticker.router",
+   "path": "app/ticker/router.py",
+   "loc": 31
+  },
+  {
+   "id": "app.ticker.dto",
+   "path": "app/ticker/dto.py",
+   "loc": 11
+  },
+  {
+   "id": "app.lib.utils.pako",
+   "path": "app/lib/utils/pako.py",
+   "loc": 55
+  },
+  {
+   "id": "app.db.models",
+   "path": "app/db/models.py",
+   "loc": 152
+  },
+  {
+   "id": "app.db",
+   "path": "app/db/__init__.py",
+   "loc": 1
+  },
+  {
+   "id": "app.db.postgres",
+   "path": "app/db/postgres.py",
+   "loc": 112
+  },
+  {
+   "id": "app.db.repository",
+   "path": "app/db/repository.py",
+   "loc": 212
+  },
+  {
+   "id": "app.financial_database",
+   "path": "app/financial_database/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.financial_database.financial_database",
+   "path": "app/financial_database/financial_database.py",
+   "loc": 22
+  },
+  {
+   "id": "app.base.interface",
+   "path": "app/base/interface.py",
+   "loc": 5
+  },
+  {
+   "id": "app.base",
+   "path": "app/base/__init__.py",
+   "loc": 0
+  },
+  {
+   "id": "app.base.utils.mongodb",
+   "path": "app/base/utils/mongodb.py",
+   "loc": 48
+  }
+ ],
+ "edges": [
+  {
+   "source": "app.ai.chatbot",
+   "target": "app.ai.sentiment_analyzer"
+  },
+  {
+   "source": "app.ai.chatbot",
+   "target": "app.ai.tools.get_yfinance_news"
+  },
+  {
+   "source": "app.ai.chatbot",
+   "target": "app.ai.tools.news_sentiment"
+  },
+  {
+   "source": "app.ai.router",
+   "target": "app.ai.chatbot"
+  },
+  {
+   "source": "app.ai.router",
+   "target": "app.ai.service"
+  },
+  {
+   "source": "app.ai.service",
+   "target": "app.ai.chatbot"
+  },
+  {
+   "source": "app.ai.service",
+   "target": "app.ai.router"
+  },
+  {
+   "source": "app.ai.tools.get_yfinance_news",
+   "target": "app.news.service"
+  },
+  {
+   "source": "app.ai.tools.news_sentiment",
+   "target": "app.news.service"
+  },
+  {
+   "source": "app.auth.basic_auth",
+   "target": "app.config"
+  },
+  {
+   "source": "app.base.utils.mongodb",
+   "target": "app.config"
+  },
+  {
+   "source": "app.chainlit.chainlit",
+   "target": "app.ai.chatbot"
+  },
+  {
+   "source": "app.chainlit.chainlit",
+   "target": "app.ai.models.gemini"
+  },
+  {
+   "source": "app.db.models",
+   "target": "app.db.postgres"
+  },
+  {
+   "source": "app.db.postgres",
+   "target": "app.config"
+  },
+  {
+   "source": "app.db.repository",
+   "target": "app.db.models"
+  },
+  {
+   "source": "app.health",
+   "target": "app.executors"
+  },
+  {
+   "source": "app.main",
+   "target": "app.ai.router"
+  },
+  {
+   "source": "app.main",
+   "target": "app.base.interface"
+  },
+  {
+   "source": "app.main",
+   "target": "app.config"
+  },
+  {
+   "source": "app.main",
+   "target": "app.health"
+  },
+  {
+   "source": "app.main",
+   "target": "app.news.router"
+  },
+  {
+   "source": "app.main",
+   "target": "app.notification.router"
+  },
+  {
+   "source": "app.main",
+   "target": "app.signals.router"
+  },
+  {
+   "source": "app.main",
+   "target": "app.ticker.router"
+  },
+  {
+   "source": "app.news.router",
+   "target": "app.news"
+  },
+  {
+   "source": "app.news.router",
+   "target": "app.news.dto"
+  },
+  {
+   "source": "app.news.service",
+   "target": "app.base.utils.mongodb"
+  },
+  {
+   "source": "app.news.service",
+   "target": "app.news.dto"
+  },
+  {
+   "source": "app.notification.router",
+   "target": "app.ai.service"
+  },
+  {
+   "source": "app.notification.service",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.dto",
+   "target": "app.signals.strategies.strategy_list"
+  },
+  {
+   "source": "app.signals.hmm_service",
+   "target": "app.signals.hmm_dto"
+  },
+  {
+   "source": "app.signals.hmm_service",
+   "target": "app.signals.signals_generator.hmm_signals"
+  },
+  {
+   "source": "app.signals.hmm_service",
+   "target": "app.signals.utils.yfinance"
+  },
+  {
+   "source": "app.signals.portfolio_replay",
+   "target": "app.db.postgres"
+  },
+  {
+   "source": "app.signals.portfolio_replay",
+   "target": "app.db.repository"
+  },
+  {
+   "source": "app.signals.portfolio_replay",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.router",
+   "target": "app.auth.basic_auth"
+  },
+  {
+   "source": "app.signals.router",
+   "target": "app.signals"
+  },
+  {
+   "source": "app.signals.router",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.router",
+   "target": "app.signals.hmm_dto"
+  },
+  {
+   "source": "app.signals.router",
+   "target": "app.signals.hmm_service"
+  },
+  {
+   "source": "app.signals.router",
+   "target": "app.signals.portfolio_replay"
+  },
+  {
+   "source": "app.signals.service",
+   "target": "app.executors"
+  },
+  {
+   "source": "app.signals.service",
+   "target": "app.signals.services.backtests"
+  },
+  {
+   "source": "app.signals.service",
+   "target": "app.signals.services.replay"
+  },
+  {
+   "source": "app.signals.service",
+   "target": "app.signals.services.results"
+  },
+  {
+   "source": "app.signals.service",
+   "target": "app.signals.services.signals"
+  },
+  {
+   "source": "app.signals.service",
+   "target": "app.signals.services.strategy_jobs"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.db.postgres"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.db.repository"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.executors"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.notification.service"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.signals.services.results"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.signals.strategies.calculate"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.signals.strategies.perform_backtest"
+  },
+  {
+   "source": "app.signals.services.backtests",
+   "target": "app.signals.utils.yfinance"
+  },
+  {
+   "source": "app.signals.services.replay",
+   "target": "app.db.postgres"
+  },
+  {
+   "source": "app.signals.services.replay",
+   "target": "app.db.repository"
+  },
+  {
+   "source": "app.signals.services.replay",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.services.replay",
+   "target": "app.signals.services.results"
+  },
+  {
+   "source": "app.signals.services.replay",
+   "target": "app.signals.strategies.replay.predefined_trade_strategy"
+  },
+  {
+   "source": "app.signals.services.replay",
+   "target": "app.signals.utils.yfinance"
+  },
+  {
+   "source": "app.signals.services.results",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.services.signals",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.services.signals",
+   "target": "app.signals.strategies.calculate"
+  },
+  {
+   "source": "app.signals.services.signals",
+   "target": "app.signals.utils.signals"
+  },
+  {
+   "source": "app.signals.services.signals",
+   "target": "app.signals.utils.yfinance"
+  },
+  {
+   "source": "app.signals.services.strategy_jobs",
+   "target": "app.db.postgres"
+  },
+  {
+   "source": "app.signals.services.strategy_jobs",
+   "target": "app.db.repository"
+  },
+  {
+   "source": "app.signals.services.strategy_jobs",
+   "target": "app.signals.dto"
+  },
+  {
+   "source": "app.signals.services.strategy_jobs",
+   "target": "app.signals.services.backtests"
+  },
+  {
+   "source": "app.signals.services.strategy_jobs",
+   "target": "app.signals.strategies.strategy_list"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_15m"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.clf_bollinger_rsi.eurjpy_bollinger_rsi_60m"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.double_candle.double_candle_signals"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.ema_bollinger.ema_bollinger"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.ema_bollinger_1_low_risk.ema_bollinger_1_low_risk"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.five_min_orb.five_min_orb_signals"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_signals"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.forex_fvg_respected.fvg_confirmation"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.grid_trading.grid_trading"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.macd_1.macd_1"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.mean_reversion_trend_filter.mean_reversion_trend_filter_signals"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.orb_autoresearch.orb_autoresearch_signals"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.super_safe_strategy.super_safe_strategy"
+  },
+  {
+   "source": "app.signals.strategies.calculate",
+   "target": "app.signals.strategies.swing_1.swing_signals"
+  },
+  {
+   "source": "app.signals.strategies.double_candle",
+   "target": "app.signals.strategies.double_candle.double_candle_backtest"
+  },
+  {
+   "source": "app.signals.strategies.double_candle",
+   "target": "app.signals.strategies.double_candle.double_candle_signals"
+  },
+  {
+   "source": "app.signals.strategies.ema_bollinger.ema_bollinger",
+   "target": "app.signals.signals_generator.ema_signals"
+  },
+  {
+   "source": "app.signals.strategies.ema_bollinger.ema_bollinger",
+   "target": "app.signals.signals_generator.rsi_signals_windowed"
+  },
+  {
+   "source": "app.signals.strategies.ema_bollinger_1_low_risk.ema_bollinger_1_low_risk",
+   "target": "app.signals.signals_generator.ema_signals"
+  },
+  {
+   "source": "app.signals.strategies.ema_bollinger_1_low_risk.ema_bollinger_1_low_risk",
+   "target": "app.signals.signals_generator.rsi_signals_windowed"
+  },
+  {
+   "source": "app.signals.strategies.five_min_orb",
+   "target": "app.signals.strategies.five_min_orb.five_min_orb_backtest"
+  },
+  {
+   "source": "app.signals.strategies.five_min_orb",
+   "target": "app.signals.strategies.five_min_orb.orb_utils"
+  },
+  {
+   "source": "app.signals.strategies.five_min_orb.five_min_orb_signals",
+   "target": "app.signals.strategies.five_min_orb"
+  },
+  {
+   "source": "app.signals.strategies.five_min_orb_confirmation",
+   "target": "app.signals.strategies.five_min_orb"
+  },
+  {
+   "source": "app.signals.strategies.five_min_orb_confirmation",
+   "target": "app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_backtest"
+  },
+  {
+   "source": "app.signals.strategies.five_min_orb_confirmation",
+   "target": "app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_signals"
+  },
+  {
+   "source": "app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_signals",
+   "target": "app.signals.strategies.five_min_orb"
+  },
+  {
+   "source": "app.signals.strategies.macd_1.macd_1",
+   "target": "app.signals.signals_generator.macd_signal_1"
+  },
+  {
+   "source": "app.signals.strategies.mean_reversion_trend_filter",
+   "target": "app.signals.strategies.mean_reversion_trend_filter.mean_reversion_trend_filter_backtest"
+  },
+  {
+   "source": "app.signals.strategies.mean_reversion_trend_filter",
+   "target": "app.signals.strategies.mean_reversion_trend_filter.mean_reversion_trend_filter_signals"
+  },
+  {
+   "source": "app.signals.strategies.orb_autoresearch.orb_autoresearch_signals",
+   "target": "app.signals.strategies.five_min_orb"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.clf_bollinger_rsi.clf_bollinger_rsi_backtest_15m"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.clf_bollinger_rsi.eurjpy_bollinger_rsi_60m_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.double_candle.double_candle_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.ema_bollinger.ema_bollinger_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.ema_bollinger_1_low_risk.ema_bollinger_1_low_risk_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.five_min_orb.five_min_orb_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.five_min_orb_confirmation.five_min_orb_confirmation_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.forex_fvg_respected.fvg_confirmation_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.grid_trading.grid_trading_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.macd_1.macd_1_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.mean_reversion_trend_filter.mean_reversion_trend_filter_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.orb_autoresearch.orb_autoresearch_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.super_safe_strategy.super_safe_strategy_backtest"
+  },
+  {
+   "source": "app.signals.strategies.perform_backtest",
+   "target": "app.signals.strategies.swing_1.swing_backtest"
+  },
+  {
+   "source": "app.signals.strategies.swing_1",
+   "target": "app.signals.strategies.swing_1.constants"
+  },
+  {
+   "source": "app.signals.strategies.swing_1",
+   "target": "app.signals.strategies.swing_1.risk_manager"
+  },
+  {
+   "source": "app.signals.strategies.swing_1",
+   "target": "app.signals.strategies.swing_1.swing"
+  },
+  {
+   "source": "app.signals.strategies.swing_1.swing",
+   "target": "app.signals.strategies.swing_1"
+  },
+  {
+   "source": "app.signals.strategies.swing_1.swing",
+   "target": "app.signals.strategies.swing_1.constants"
+  },
+  {
+   "source": "app.signals.strategies.swing_1.swing",
+   "target": "app.signals.strategies.swing_1.risk_manager"
+  },
+  {
+   "source": "app.signals.strategies.swing_1.swing_signals",
+   "target": "app.signals.strategies.swing_1"
+  },
+  {
+   "source": "app.ticker.router",
+   "target": "app.ticker"
+  },
+  {
+   "source": "app.ticker.router",
+   "target": "app.ticker.dto"
+  },
+  {
+   "source": "app.ticker.service",
+   "target": "app.base.utils.mongodb"
+  }
+ ]
+};
+
+const NOTES = {
+  "app.main": "Entry point. create_app() builds the FastAPI app, registers all routers, mounts /chat only when CHAINLIT_AUTH_SECRET is set.",
+  "app.config": "Centralized lazy Settings (env-driven). Importing app modules must not open network clients.",
+  "app.health": "GET /health — probes the bounded BACKTEST_EXECUTOR; 503 when saturated.",
+  "app.executors": "BACKTEST_EXECUTOR: ThreadPoolExecutor(max_workers=5). All backtest runs route through it to prevent pool exhaustion.",
+  "app.signals.router": "HTTP layer: validation (DTOs), basic auth, delegates to services. Owns no business logic.",
+  "app.signals.service": "Compatibility shim re-exporting from app/signals/services/. New code imports the focused modules directly.",
+  "app.signals.services.backtests": "Runs backtests off the event loop (BACKTEST_EXECUTOR), renders HTML, persists stats + trade actions, sends notifications.",
+  "app.signals.services.signals": "Signal generation orchestration: yfinance → calculate_signals → DTO.",
+  "app.signals.services.replay": "Replays stored TradeActions against fresh prices.",
+  "app.signals.services.results": "Pure helpers: stats envelope, persistence payload, backtest HTML rendering.",
+  "app.signals.services.strategy_jobs": "GET /strategies listing + scheduled refresh job; isolates per-strategy failures.",
+  "app.signals.strategies.strategy_list": "Single registry of public strategy IDs — the API contract.",
+  "app.signals.strategies.calculate": "Signals dispatcher: public ID → <strategy>_signals(df, parameters).",
+  "app.signals.strategies.perform_backtest": "Backtest dispatcher: public ID → <strategy>_backtest(df, params, size, skip_optimization, best_params).",
+  "app.db.repository": "Owns all PostgreSQL queries. Services never issue SQL directly.",
+  "app.db.postgres": "Async engine + session factory.",
+  "app.base.utils.mongodb": "Lazy process-wide Motor client.",
+  "app.signals.utils.yfinance": "Yahoo Finance access; explicit start/end wins over period. Sync fetch wrapped in asyncio.to_thread by callers.",
+  "app.signals.hmm_service": "Hidden Markov Model market-regime probabilities (GET /signals/hmm/regimes).",
+  "app.signals.portfolio_replay": "Portfolio-level replay across enabled strategies.",
+  "app.auth.basic_auth": "HTTP Basic authentication dependency."
+};
+
+const LAYERS = [
+  { id: "entry",    label: "entry / app shell", color: "var(--c-entry)" },
+  { id: "router",   label: "routers",           color: "var(--c-router)" },
+  { id: "service",  label: "services",          color: "var(--c-service)" },
+  { id: "strategy", label: "strategies",        color: "var(--c-strategy)" },
+  { id: "data",     label: "db / persistence",  color: "var(--c-data)" },
+  { id: "market",   label: "market data / ai",  color: "var(--c-market)" },
+  { id: "other",    label: "support",           color: "var(--c-other)" }
+];
+
+function layerOf(id) {
+  if (["app.main", "app.config", "app.health", "app.executors"].includes(id)) return "entry";
+  if (id.endsWith(".router")) return "router";
+  if (id.startsWith("app.signals.services") || id === "app.signals.service") return "service";
+  if (id.startsWith("app.signals.strategies")) return "strategy";
+  if (id.startsWith("app.db") || id === "app.base.utils.mongodb") return "data";
+  if (id.startsWith("app.signals.utils") || id.startsWith("app.ai") || id.startsWith("app.news") || id.startsWith("app.ticker")) return "market";
+  return "other";
+}
+
+const layerOn = Object.fromEntries(LAYERS.map(l => [l.id, true]));
+const nodes = GRAPH.nodes.map(n => ({ ...n, layer: layerOf(n.id) }));
+const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+const edges = GRAPH.edges
+  .filter(e => byId[e.source] && byId[e.target])
+  .map(e => ({ ...e }));
+
+const outMap = {}, inMap = {};
+nodes.forEach(n => { outMap[n.id] = []; inMap[n.id] = []; });
+edges.forEach(e => { outMap[e.source].push(e.target); inMap[e.target].push(e.source); });
+
+const svg = document.getElementById("graph");
+const W = () => window.innerWidth, H = () => window.innerHeight - 52;
+svg.setAttribute("width", W()); svg.setAttribute("height", H());
+
+const gEdges = document.createElementNS("http://www.w3.org/2000/svg", "g");
+const gNodes = document.createElementNS("http://www.w3.org/2000/svg", "g");
+svg.appendChild(gEdges); svg.appendChild(gNodes);
+
+const hub = id => outMap[id].length + inMap[id].length >= 6;
+const radius = n => 4 + Math.sqrt(n.loc) * 0.35;
+
+nodes.forEach(n => {
+  const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  g.setAttribute("class", "node" + (hub(n.id) ? " hub" : ""));
+  const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  c.setAttribute("r", radius(n));
+  const layer = LAYERS.find(l => l.id === n.layer);
+  c.style.fill = layer.color;
+  const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  const short = n.id.replace(/^app\./, "");
+  t.textContent = short.length > 26 ? short.slice(0, 25) + "…" : short;
+  t.setAttribute("x", radius(n) + 5); t.setAttribute("y", 3.5);
+  g.appendChild(c); g.appendChild(t);
+  g.addEventListener("click", ev => { ev.stopPropagation(); selectNode(n.id); });
+  n.el = g; n.circleEl = c;
+  gNodes.appendChild(g);
+  // seed positions: layer rings
+  const li = LAYERS.findIndex(l => l.id === n.layer);
+  const a = Math.random() * Math.PI * 2;
+  const ring = 120 + li * 90 + Math.random() * 60;
+  n.x = W() / 2 + Math.cos(a) * ring;
+  n.y = H() / 2 + Math.sin(a) * ring * 0.7;
+});
+
+edges.forEach(e => {
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("class", "edge");
+  gEdges.appendChild(p);
+  e.el = p;
+});
+
+svg.addEventListener("click", () => selectNode(null));
+
+// pan / zoom
+let viewBox = { x: 0, y: 0, w: W(), h: H() };
+function applyViewBox() { svg.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`); }
+applyViewBox();
+let drag = null;
+svg.addEventListener("mousedown", ev => { drag = { x: ev.clientX, y: ev.clientY, vb: { ...viewBox } }; });
+window.addEventListener("mousemove", ev => {
+  if (!drag) return;
+  const k = viewBox.w / W();
+  viewBox.x = drag.vb.x - (ev.clientX - drag.x) * k;
+  viewBox.y = drag.vb.y - (ev.clientY - drag.y) * k;
+  applyViewBox();
+});
+window.addEventListener("mouseup", () => { drag = null; });
+svg.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const k = ev.deltaY > 0 ? 1.12 : 0.89;
+  const mx = viewBox.x + viewBox.w / 2, my = viewBox.y + viewBox.h / 2;
+  viewBox.w *= k; viewBox.h *= k;
+  viewBox.x = mx - viewBox.w / 2; viewBox.y = my - viewBox.h / 2;
+  applyViewBox();
+}, { passive: false });
+
+// force simulation
+const sim = { alpha: 0.9, min: 0.005 };
+function tick() {
+  const cx = viewBox.x + viewBox.w / 2, cy = viewBox.y + viewBox.h / 2;
+  const force = (strength, dist) => {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
+        if (d2 > dist * dist) continue;
+        const d = Math.sqrt(d2);
+        const f = strength * sim.alpha * (dist - d) / d;
+        a.x -= dx * f * 0.5; a.y -= dy * f * 0.5;
+        b.x += dx * f * 0.5; b.y += dy * f * 0.5;
+      }
+    }
+  };
+  force(-0.06, 90);   // repulsion
+  force(0.012, 200);  // layer cohesion
+
+  edges.forEach(e => {
+    const a = byId[e.source], b = byId[e.target];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+    const target = 110;
+    const f = 0.015 * sim.alpha * (d - target) / d;
+    a.x += dx * f; a.y += dy * f;
+    b.x -= dx * f; b.y -= dy * f;
+  });
+
+  nodes.forEach(n => {
+    n.x += (cx - n.x) * 0.0025 * sim.alpha * 10;
+    n.y += (cy - n.y) * 0.0025 * sim.alpha * 10;
+    n.el.setAttribute("transform", `translate(${n.x},${n.y})`);
+  });
+  edges.forEach(e => {
+    const a = byId[e.source], b = byId[e.target];
+    const mx = (a.x + b.x) / 2 + (b.y - a.y) * 0.08;
+    const my = (a.y + b.y) / 2 - (b.x - a.x) * 0.08;
+    e.el.setAttribute("d", `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`);
+  });
+
+  sim.alpha *= 0.995;
+  if (sim.alpha > sim.min) requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// selection & highlight
+let selected = null;
+function refreshHighlight() {
+  const visible = n => layerOn[n.layer] && matchesFilter(n.id);
+  const neighborIds = new Set();
+  if (selected) {
+    neighborIds.add(selected);
+    outMap[selected].forEach(id => neighborIds.add(id));
+    inMap[selected].forEach(id => neighborIds.add(id));
+  }
+  nodes.forEach(n => {
+    n.el.style.display = visible(n) ? "" : "none";
+    const dim = selected && !neighborIds.has(n.id);
+    n.el.classList.toggle("dimmed", dim);
+    n.el.classList.toggle("selected", n.id === selected);
+  });
+  edges.forEach(e => {
+    const sv = byId[e.source] && visible(byId[e.source]);
+    const tv = byId[e.target] && visible(byId[e.target]);
+    e.el.style.display = sv && tv ? "" : "none";
+    const hl = selected && (e.source === selected || e.target === selected);
+    e.el.classList.toggle("hl", hl);
+    e.el.classList.toggle("dimmed", selected && !hl);
+  });
+  document.getElementById("stats").textContent =
+    `${nodes.filter(visible).length}/${nodes.length} modules · ${edges.filter(e => e.el.style.display !== "none").length} imports`;
+}
+
+function selectNode(id) {
+  selected = id;
+  const panel = document.getElementById("detail");
+  if (!id) { panel.classList.remove("open"); refreshHighlight(); return; }
+  const n = byId[id];
+  document.getElementById("d-name").textContent = n.id;
+  document.getElementById("d-path").textContent = n.path;
+  document.getElementById("d-loc").innerHTML = `<b>${n.loc}</b> lines · ${outMap[id].length} imports · ${inMap[id].length} imported-by`;
+  const note = NOTES[id];
+  const noteEl = document.getElementById("d-note");
+  noteEl.style.display = note ? "" : "none";
+  noteEl.textContent = note || "";
+  const dep = arr => arr.length
+    ? arr.map(x => `<span class="dep" onclick="selectNode('${x}')">${x}</span>`).join("")
+    : `<span class="none">none</span>`;
+  document.getElementById("d-out").innerHTML = dep(outMap[id].sort());
+  document.getElementById("d-in").innerHTML = dep(inMap[id].sort());
+  panel.classList.add("open");
+  refreshHighlight();
+}
+
+// filter
+let filterText = "";
+function matchesFilter(id) { return !filterText || id.includes(filterText); }
+document.getElementById("search").addEventListener("input", ev => {
+  filterText = ev.target.value.trim().toLowerCase();
+  refreshHighlight();
+});
+
+// legend with toggles
+const legend = document.getElementById("legend");
+LAYERS.forEach(l => {
+  const count = nodes.filter(n => n.layer === l.id).length;
+  const row = document.createElement("div");
+  row.className = "legend-row";
+  row.innerHTML = `<span class="dot" style="background:${l.color}"></span>${l.label}<span class="count">${count}</span>`;
+  row.addEventListener("click", () => {
+    layerOn[l.id] = !layerOn[l.id];
+    row.classList.toggle("off", !layerOn[l.id]);
+    refreshHighlight();
+  });
+  legend.appendChild(row);
+});
+
+window.addEventListener("resize", () => {
+  svg.setAttribute("width", W()); svg.setAttribute("height", H());
+});
+refreshHighlight();
+</script>
+</body>
+</html>

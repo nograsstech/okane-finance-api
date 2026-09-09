@@ -13,7 +13,7 @@
 ## Task 1: Create shared utilities module (orb_utils.py)
 
 **Files:**
-- Create: `app/signals/strategies/5_min_orb/orb_utils.py`
+- Create: `app/signals/strategies/five_min_orb/orb_utils.py`
 
 **Step 1: Write the failing test**
 
@@ -101,7 +101,7 @@ Expected: `ModuleNotFoundError: No module named 'app.signals.strategies.five_min
 
 **Step 3: Write minimal implementation**
 
-Create: `app/signals/strategies/5_min_orb/orb_utils.py`
+Create: `app/signals/strategies/five_min_orb/orb_utils.py`
 
 ```python
 """
@@ -317,7 +317,7 @@ Expected: All tests PASS
 **Step 5: Commit**
 
 ```bash
-git add tests/test_orb_utils.py app/signals/strategies/5_min_orb/orb_utils.py
+git add tests/test_orb_utils.py app/signals/strategies/five_min_orb/orb_utils.py
 git commit -m "feat: add ORB utilities for timezone and session detection
 
 - UTC to session timezone conversion with DST handling
@@ -332,7 +332,7 @@ git commit -m "feat: add ORB utilities for timezone and session detection
 ## Task 2: Create ORB detection utilities
 
 **Files:**
-- Modify: `app/signals/strategies/5_min_orb/orb_utils.py`
+- Modify: `app/signals/strategies/five_min_orb/orb_utils.py`
 
 **Step 1: Write the failing test**
 
@@ -386,7 +386,7 @@ Expected: `NameError: name 'identify_opening_range' is not defined`
 
 **Step 3: Write implementation**
 
-Add to `app/signals/strategies/5_min_orb/orb_utils.py`:
+Add to `app/signals/strategies/five_min_orb/orb_utils.py`:
 
 ```python
 def identify_opening_range(
@@ -475,7 +475,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add tests/test_orb_utils.py app/signals/strategies/5_min_orb/orb_utils.py
+git add tests/test_orb_utils.py app/signals/strategies/five_min_orb/orb_utils.py
 git commit -m "feat: add opening range identification utility
 
 - Find first 5-min candle after session open
@@ -489,7 +489,7 @@ git commit -m "feat: add opening range identification utility
 ## Task 3: Create __init__.py for 5_min_orb module
 
 **Files:**
-- Create: `app/signals/strategies/5_min_orb/__init__.py`
+- Create: `app/signals/strategies/five_min_orb/__init__.py`
 
 **Step 1: Create __init__.py**
 
@@ -508,7 +508,7 @@ __all__ = ['five_min_orb_signals', 'backtest']
 **Step 2: Commit**
 
 ```bash
-git add app/signals/strategies/5_min_orb/__init__.py
+git add app/signals/strategies/five_min_orb/__init__.py
 git commit -m "feat: add 5_min_orb module init"
 ```
 
@@ -517,7 +517,7 @@ git commit -m "feat: add 5_min_orb module init"
 ## Task 4: Create signal generator for Version A
 
 **Files:**
-- Create: `app/signals/strategies/5_min_orb/five_min_orb_signals.py`
+- Create: `app/signals/strategies/five_min_orb/five_min_orb_signals.py`
 
 **Step 1: Write the failing test**
 
@@ -591,7 +591,7 @@ Expected: `ModuleNotFoundError: No module named 'app.signals.strategies.five_min
 
 **Step 3: Write implementation**
 
-Create: `app/signals/strategies/5_min_orb/five_min_orb_signals.py`
+Create: `app/signals/strategies/five_min_orb/five_min_orb_signals.py`
 
 ```python
 """
@@ -814,7 +814,7 @@ Expected: Tests PASS (may need to debug signal timing)
 **Step 5: Commit**
 
 ```bash
-git add tests/test_five_min_orb_signals.py app/signals/strategies/5_min_orb/five_min_orb_signals.py
+git add tests/test_five_min_orb_signals.py app/signals/strategies/five_min_orb/five_min_orb_signals.py
 git commit -m "feat: implement Version A signal generation
 
 - Identify opening range (first 5-min candle)
@@ -829,7 +829,7 @@ git commit -m "feat: implement Version A signal generation
 ## Task 5: Create backtest for Version A
 
 **Files:**
-- Create: `app/signals/strategies/5_min_orb/five_min_orb_backtest.py`
+- Create: `app/signals/strategies/five_min_orb/five_min_orb_backtest.py`
 
 **Step 1: Write implementation**
 
@@ -1061,7 +1061,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 **Step 2: Commit**
 
 ```bash
-git add app/signals/strategies/5_min_orb/five_min_orb_backtest.py
+git add app/signals/strategies/five_min_orb/five_min_orb_backtest.py
 git commit -m "feat: add Version A backtest implementation
 
 - Strategy class with immediate breakout entry
@@ -1233,7 +1233,7 @@ git commit -m "feat: add ORB strategies routing to calculate.py"
 ## Task 8: Create Version B signal generator
 
 **Files:**
-- Create: `app/signals/strategies/5_min_orb_confirmation/five_min_orb_confirmation_signals.py`
+- Create: `app/signals/strategies/five_min_orb_confirmation/five_min_orb_confirmation_signals.py`
 
 **Step 1: Write implementation**
 
@@ -1507,7 +1507,7 @@ def five_min_orb_confirmation_signals(df: pd.DataFrame, parameters: Optional[Dic
 **Step 2: Commit**
 
 ```bash
-git add app/signals/strategies/5_min_orb_confirmation/five_min_orb_confirmation_signals.py
+git add app/signals/strategies/five_min_orb_confirmation/five_min_orb_confirmation_signals.py
 git commit -m "feat: implement Version B signal generation
 
 - Three-step process: breakout → retest → confirmation
@@ -1521,7 +1521,7 @@ git commit -m "feat: implement Version B signal generation
 ## Task 9: Create Version B backtest
 
 **Files:**
-- Create: `app/signals/strategies/5_min_orb_confirmation/five_min_orb_confirmation_backtest.py`
+- Create: `app/signals/strategies/five_min_orb_confirmation/five_min_orb_confirmation_backtest.py`
 
 **Step 1: Write implementation**
 
@@ -1717,7 +1717,7 @@ def backtest(df, strategy_parameters, size=0.03, skip_optimization=False, best_p
 **Step 2: Create __init__.py for Version B**
 
 ```bash
-cat > app/signals/strategies/5_min_orb_confirmation/__init__.py << 'EOF'
+cat > app/signals/strategies/five_min_orb_confirmation/__init__.py << 'EOF'
 """
 5-Minute ORB Strategy - Version B
 
@@ -1733,7 +1733,7 @@ EOF
 **Step 3: Commit**
 
 ```bash
-git add app/signals/strategies/5_min_orb_confirmation/
+git add app/signals/strategies/five_min_orb_confirmation/
 git commit -m "feat: add Version B backtest and module init
 
 - Tighter stop loss (3-5 pips from OR level)

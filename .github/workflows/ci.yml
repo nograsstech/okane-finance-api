@@ -24,8 +24,42 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
+      - name: Install frozen dependencies
         run: uv sync --frozen --dev
 
-      - name: Run tests
-        run: uv run pytest -m "not integration" --tb=short -q
+      - name: Lint refactored core
+        run: |
+          uv run ruff check \
+            app/config.py app/main.py app/ai/router.py app/auth/basic_auth.py \
+            app/base/utils/mongodb.py app/db/postgres.py app/db/repository.py \
+            app/signals/router.py app/signals/dto.py app/signals/hmm_dto.py \
+            app/signals/hmm_service.py app/signals/portfolio_replay.py \
+            app/signals/service.py app/signals/services app/signals/utils/yfinance.py \
+            app/signals/strategies/calculate.py \
+            app/signals/strategies/perform_backtest.py \
+            app/notification/router.py \
+            scripts/refresh_us_stock_marketcap.py \
+            tests/test_auth.py tests/test_backtest_service.py \
+            tests/test_hmm_service.py tests/test_mongodb_client.py \
+            tests/test_lazy_app_import.py tests/test_openapi_contract.py \
+            tests/test_orb_sessions.py \
+            tests/test_portfolio_replay.py tests/test_replay_service.py \
+            tests/test_signal_service.py tests/test_signals_api_contracts.py \
+            tests/test_signals_dto.py tests/test_strategy_jobs.py \
+            tests/test_yfinance_timeout.py
+
+      - name: Type-check refactored core
+        run: uv run mypy
+
+      - name: Run non-integration tests with focused core coverage
+        run: |
+          uv run pytest -m "not integration" --tb=short -q \
+            --cov=app.signals.services \
+            --cov=app.signals.utils.yfinance \
+            --cov=app.signals.hmm_service \
+            --cov=app.signals.portfolio_replay \
+            --cov=app.auth.basic_auth \
+            --cov=app.base.utils.mongodb \
+            --cov=app.db.repository \
+            --cov-report=term-missing \
+            --cov-fail-under=80

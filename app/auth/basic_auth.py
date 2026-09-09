@@ -1,23 +1,31 @@
 import secrets
 from typing import Annotated
-import os
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
+from app.config import Settings, get_settings
+
 security = HTTPBasic()
+
 
 def get_current_username(
     credentials: Annotated[HTTPBasicCredentials, Depends(security)],
-):
-    current_username_bytes = credentials.username.encode("utf8")
-    correct_username_bytes = os.getenv("OKANE_FINANCE_API_USER").encode()
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> str:
+    if settings.api_username is None or settings.api_password is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="API authentication is not configured",
+        )
+
     is_correct_username = secrets.compare_digest(
-        current_username_bytes, correct_username_bytes
+        credentials.username.encode("utf8"),
+        settings.api_username.encode("utf8"),
     )
-    current_password_bytes = credentials.password.encode("utf8")
-    correct_password_bytes = os.getenv("OKANE_FINANCE_API_PASSWORD").encode()
     is_correct_password = secrets.compare_digest(
-        current_password_bytes, correct_password_bytes
+        credentials.password.encode("utf8"),
+        settings.api_password.encode("utf8"),
     )
     if not (is_correct_username and is_correct_password):
         raise HTTPException(

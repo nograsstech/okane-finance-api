@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any, Literal
+from datetime import date
+from datetime import datetime as DateTime
+from typing import Literal, cast
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, JsonValue, field_validator, model_validator
 
 from app.signals.strategies.strategy_list import strategy_list
 
@@ -12,7 +13,10 @@ class SignalRequestDTO(BaseModel):
     ticker: str = Field(...)
     period: str | None = Field(None)
     interval: str = Field(...)
-    strategy: Literal[tuple(strategy_list)] | None = Field(None, allowed_values=strategy_list)  # type: ignore
+    strategy: str | None = Field(
+        None,
+        json_schema_extra={"enum": cast(list[JsonValue], strategy_list)},
+    )
     parameters: str | None = Field(None)
     start: str | None = Field(None)
     end: str | None = Field(None)
@@ -20,18 +24,25 @@ class SignalRequestDTO(BaseModel):
     backtest_process_uuid: str | None = Field(None)
     skip_optimization: bool = Field(
         True,
-        description="Skip parameter optimization unless an expensive optimization run is requested.",
+        description="Skip optimization unless an expensive optimization run is requested.",
     )
+
+    @field_validator("strategy")
+    @classmethod
+    def validate_strategy(cls, value: str | None) -> str | None:
+        if value is not None and value not in strategy_list:
+            raise ValueError(f"strategy must be one of: {', '.join(strategy_list)}")
+        return value
 
 
 class Signal(BaseModel):
     gmtTime: str = Field(...)
-    Open: float = (Field(...),)
-    High: float = (Field(...),)
-    Low: float = (Field(...),)
-    Close: float = (Field(...),)
-    Volume: float = (Field(...),)
-    TotalSignal: float = (Field(...),)
+    Open: float = Field(...)
+    High: float = Field(...)
+    Low: float = Field(...)
+    Close: float = Field(...)
+    Volume: float = Field(...)
+    TotalSignal: float = Field(...)
 
 
 class SignalsDict(BaseModel):
@@ -41,9 +52,9 @@ class SignalsDict(BaseModel):
 
 class SignalRequestData(BaseModel):
     ticker: str
-    period: str
+    period: str | None
     interval: str
-    strategy: str
+    strategy: str | None
     signals: SignalsDict
 
 
@@ -54,11 +65,11 @@ class SignalResponseDTO(BaseModel):
 
 
 class BacktestStats(BaseModel):
-    ticker: Any
+    ticker: str
     max_drawdown_percentage: float
-    start_time: Any
-    end_time: Any
-    duration: Any
+    start_time: str
+    end_time: str
+    duration: str
     exposure_time_percentage: float
     final_equity: float
     peak_equity: float
@@ -70,17 +81,17 @@ class BacktestStats(BaseModel):
     sortino_ratio: float
     calmar_ratio: float
     average_drawdown_percentage: float
-    max_drawdown_duration: Any
-    average_drawdown_duration: Any
+    max_drawdown_duration: str
+    average_drawdown_duration: str
     trade_count: int
     win_rate: float
     best_trade: float
     worst_trade: float
     avg_trade: float
-    max_trade_duration: Any
-    average_trade_duration: Any
+    max_trade_duration: str
+    average_trade_duration: str
     profit_factor: float
-    html: Any
+    html: str
     tpslRatio: float
     sl_coef: float
 
@@ -89,12 +100,6 @@ class BacktestResponseDTO(BaseModel):
     status: int = Field(...)
     message: str = Field(...)
     data: BacktestStats = Field(...)
-
-
-class BacktestProcessResponseDTO(BaseModel):
-    status: int = Field(...)
-    message: str = Field(...)
-    data: str = Field(...)
 
 
 class TradeAction(BaseModel):
@@ -157,7 +162,7 @@ class PortfolioReplaySummaryDTO(BaseModel):
 
 
 class PortfolioEquityPointDTO(BaseModel):
-    datetime: datetime
+    datetime: DateTime
     equity: float
     pnl: float
 
@@ -166,7 +171,7 @@ class PortfolioReplayTradeDTO(BaseModel):
     backtest_id: int
     ticker: str
     strategy: str
-    datetime: datetime
+    datetime: DateTime
     action: str
     direction: Literal["long", "short"]
     entry_price: float
@@ -178,7 +183,7 @@ class PortfolioReplayTradeDTO(BaseModel):
     pnl: float | None
     cost: float
     status: Literal["tp", "sl", "close", "marked", "skipped"]
-    exit_datetime: datetime | None
+    exit_datetime: DateTime | None
     message: str
 
 
