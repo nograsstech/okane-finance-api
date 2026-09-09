@@ -140,6 +140,9 @@ Python package names and public strategy identifiers are separate. For example,
 `five_min_orb` is the internal package while `5_min_orb` remains the public API identifier;
 `five_min_orb_confirmation` similarly maps to `5_min_orb_confirmation`.
 
+Full contracts (function signatures, the four-value backtest return, worker-safety
+rules, verification commands): `docs/adding-a-strategy.md`.
+
 ## Utility scripts
 
 Repository utilities live under `scripts/`. For example, the stock-list refresh reads MongoDB
