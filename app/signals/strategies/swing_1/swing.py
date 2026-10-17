@@ -4,7 +4,6 @@ import os
 from typing import Optional, List, Dict
 import numpy as np
 import pandas as pd
-from scipy.signal import argrelextrema
 from backtesting import Strategy
 
 # Optional talib for candlestick pattern detection
@@ -51,6 +50,9 @@ def identify_zones(
         price, method, type, strength (touches), dist_pct
     sorted by price ascending.
     """
+    # Imported lazily: scipy.signal adds ~65 MB RSS at import time.
+    from scipy.signal import argrelextrema
+
     if current_price is None:
         current_price = df["Close"].iloc[-1]
 
