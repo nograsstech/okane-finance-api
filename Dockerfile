@@ -68,6 +68,14 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+# Memory tuning for small hosts: cap glibc malloc arenas (threaded numpy/pandas work otherwise
+# fragments one arena per thread) and return freed memory to the OS sooner.
+ENV MALLOC_ARENA_MAX=2
+ENV MALLOC_TRIM_THRESHOLD_=131072
+# Keep BLAS/OpenMP thread pools from spawning per-core threads and buffers.
+ENV OMP_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
 
 # Expose port
 EXPOSE 8000
