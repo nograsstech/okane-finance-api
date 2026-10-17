@@ -1,6 +1,5 @@
 import os
 
-from chainlit.utils import mount_chainlit
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -54,6 +53,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RootResponse(status=200, message="Monii 0.1.0")
 
     if os.environ.get(CHAINLIT_AUTH_SECRET_ENV):
+        # Imported lazily: chainlit costs ~150 MB RSS and is only needed when /chat is enabled.
+        from chainlit.utils import mount_chainlit
+
         mount_chainlit(app=application, target="app/chainlit/chainlit.py", path="/chat")
     else:
         application.mount("/chat", _chainlit_unavailable, name="chat")

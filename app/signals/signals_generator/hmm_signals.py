@@ -19,8 +19,6 @@ Regime characteristics (fallback fixed params, obs_momentum = (Close−EMA)/ATR)
 import numpy as np
 import pandas as pd
 import pandas_ta as ta
-from scipy.stats import multivariate_normal
-from sklearn.mixture import GaussianMixture
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -111,6 +109,9 @@ def calibrate_emissions(
         return None
 
     try:
+        # Imported lazily: sklearn adds ~70 MB RSS and is only needed for HMM calibration.
+        from sklearn.mixture import GaussianMixture
+
         gmm = GaussianMixture(
             n_components=3,
             covariance_type='full',
@@ -169,6 +170,8 @@ def regime_likelihoods(
     Returns:
         (n, 3) non-negative likelihood values.
     """
+    from scipy.stats import multivariate_normal  # lazy: keeps scipy.stats off the startup path
+
     n = len(obs)
     likes = np.zeros((n, 3))
     for i, regime in enumerate(_IDX_TO_NAME):

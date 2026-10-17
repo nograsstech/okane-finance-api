@@ -9,7 +9,6 @@ Calculates TotalSignal based on:
 from typing import Optional
 import pandas as pd
 import numpy as np
-from scipy.signal import argrelextrema
 
 # Try to import talib for pattern detection
 try:
@@ -32,6 +31,9 @@ def identify_support_resistance_zones(
 
     Returns a DataFrame with columns: price, type, strength
     """
+    # Imported lazily: scipy.signal adds ~65 MB RSS at import time.
+    from scipy.signal import argrelextrema
+
     if current_price is None:
         current_price = df["Close"].iloc[-1]
 
